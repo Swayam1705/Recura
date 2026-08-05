@@ -1,0 +1,4 @@
+Model,Accuracy,Precision,Recall,F1-Score,MCC,Kappa,ROC-AUC
+Voting Classifier (Soft),0.974,1.0,0.9091,0.9524,0.9366,0.9346,0.9926
+Voting Classifier (Hard),0.974,1.0,0.9091,0.9524,0.9366,0.9346,
+Deep CNN,0.7143,0.0,0.0,0.0,0.0,0.0,0.976

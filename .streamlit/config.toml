@@ -1,0 +1,16 @@
+[theme]
+# A deep, trustworthy medical/tech blue for buttons and accents
+primaryColor = "#2563EB" 
+
+# Pure white background for a clean, modern SaaS look
+backgroundColor = "#FFFFFF" 
+
+# A very subtle, cool light-gray for the sidebar and secondary elements 
+# (Prevents the screen from looking blindingly white)
+secondaryBackgroundColor = "#F8FAFC" 
+
+# Dark charcoal text (easier on the eyes than pure black)
+textColor = "#1E293B" 
+
+# Clean, modern font
+font = "sans serif"
