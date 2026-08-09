@@ -1,0 +1,435 @@
+"use client";
+
+import { motion } from "framer-motion";
+import Link from "next/link";
+import { ArrowRight, Play, Shield, Zap, Brain } from "lucide-react";
+import DashboardPreview from "./DashboardPreview";
+
+const badges = [
+  { icon: Shield, text: "HIPAA Compliant" },
+  { icon: Zap, text: "Federated Learning" },
+  { icon: Brain, text: "Explainable AI" },
+];
+
+const stats = [
+  { value: "99.2%", label: "Model Accuracy" },
+  { value: "2,400+", label: "Active Doctors" },
+  { value: "156", label: "Hospitals" },
+];
+
+export default function Hero() {
+  return (
+    <section style={{ position: "relative", minHeight: "100vh", overflow: "hidden" }}>
+      <div style={{ position: "absolute", inset: 0, zIndex: 0 }}>
+        <video
+          autoPlay
+          loop
+          muted
+          playsInline
+          style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }}
+        >
+          <source
+            src="https://cdn.pixabay.com/video/2024/03/15/203960-923909579_large.mp4"
+            type="video/mp4"
+          />
+        </video>
+
+        <div style={{
+          position: "absolute",
+          inset: 0,
+          background: "linear-gradient(135deg, rgba(15, 23, 42, 0.85) 0%, rgba(30, 58, 138, 0.75) 40%, rgba(12, 74, 110, 0.85) 100%)",
+        }} />
+        <div style={{
+          position: "absolute",
+          inset: 0,
+          background: "linear-gradient(to bottom, rgba(15, 23, 42, 0.4), rgba(15, 23, 42, 0.7))",
+        }} />
+      </div>
+
+      <nav style={{
+        position: "absolute",
+        top: 0,
+        left: 0,
+        right: 0,
+        zIndex: 50,
+        backdropFilter: "blur(12px)",
+        backgroundColor: "rgba(255, 255, 255, 0.05)",
+        borderBottom: "1px solid rgba(255, 255, 255, 0.1)",
+      }}>
+        <div style={{
+          maxWidth: "1400px",
+          margin: "0 auto",
+          padding: "1.25rem 2rem",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: "2rem",
+        }}>
+          <Link href="/" style={{ display: "flex", alignItems: "center", gap: "0.75rem", textDecoration: "none" }}>
+            <div style={{
+              width: "48px",
+              height: "48px",
+              borderRadius: "16px",
+              background: "linear-gradient(135deg, #3B82F6, #1D4ED8)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              boxShadow: "0 8px 24px rgba(59, 130, 246, 0.5)",
+            }}>
+              <svg viewBox="0 0 100 100" width="28" height="28">
+                <path
+                  d="M20 55 L35 55 L42 40 L52 68 L60 48 L67 55 L80 55"
+                  stroke="white"
+                  strokeWidth="6"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  fill="none"
+                />
+              </svg>
+            </div>
+            <div>
+              <div style={{
+                fontFamily: "var(--font-space)",
+                fontWeight: "700",
+                color: "white",
+                fontSize: "1.5rem",
+                lineHeight: "1",
+                letterSpacing: "-0.02em",
+              }}>
+                Recura
+              </div>
+              <div style={{
+                color: "#93C5FD",
+                fontSize: "10px",
+                fontWeight: "700",
+                letterSpacing: "0.25em",
+                textTransform: "uppercase",
+                marginTop: "4px",
+              }}>
+                Clinical AI Platform
+              </div>
+            </div>
+          </Link>
+
+          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", padding: "0.5rem 0.75rem", borderRadius: "9999px", backdropFilter: "blur(16px)", backgroundColor: "rgba(255, 255, 255, 0.1)", border: "1px solid rgba(255, 255, 255, 0.2)" }} className="hidden lg:flex">
+            {["Features", "How It Works", "Security", "Pricing"].map((item) => (
+              <Link
+                key={item}
+                href={`#${item.toLowerCase().replace(" ", "-")}`}
+                style={{
+                  color: "rgba(255, 255, 255, 0.8)",
+                  textDecoration: "none",
+                  fontSize: "0.875rem",
+                  fontWeight: "500",
+                  padding: "0.5rem 1rem",
+                  borderRadius: "9999px",
+                  whiteSpace: "nowrap",
+                  transition: "all 0.2s",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.color = "white";
+                  e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.1)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.color = "rgba(255, 255, 255, 0.8)";
+                  e.currentTarget.style.backgroundColor = "transparent";
+                }}
+              >
+                {item}
+              </Link>
+            ))}
+          </div>
+
+          <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }} className="hidden lg:flex">
+            <Link
+              href="/login"
+              style={{
+                padding: "0.625rem 1.25rem",
+                fontSize: "0.875rem",
+                fontWeight: "600",
+                color: "rgba(255, 255, 255, 0.9)",
+                textDecoration: "none",
+              }}
+            >
+              Sign In
+            </Link>
+            <Link
+              href="/dashboard"
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "0.5rem",
+                padding: "0.75rem 1.5rem",
+                fontSize: "0.875rem",
+                fontWeight: "700",
+                color: "white",
+                background: "linear-gradient(to right, #3B82F6, #2563EB)",
+                borderRadius: "0.75rem",
+                boxShadow: "0 10px 24px rgba(59, 130, 246, 0.5)",
+                textDecoration: "none",
+                whiteSpace: "nowrap",
+                transition: "all 0.2s",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = "scale(1.05)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = "scale(1)";
+              }}
+            >
+              Get Started
+              <ArrowRight size={16} />
+            </Link>
+          </div>
+        </div>
+      </nav>
+
+      <div style={{
+        position: "relative",
+        zIndex: 10,
+        minHeight: "100vh",
+        display: "flex",
+        alignItems: "center",
+        paddingTop: "8rem",
+        paddingBottom: "6rem",
+      }}>
+        <div style={{
+          maxWidth: "1400px",
+          width: "100%",
+          margin: "0 auto",
+          padding: "0 2rem",
+          display: "grid",
+          gridTemplateColumns: "1fr",
+          gap: "4rem",
+          alignItems: "center",
+        }} className="hero-grid">
+          <div style={{ maxWidth: "700px" }}>
+            <motion.div
+              initial={{ opacity: 0, y: 30 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.3, duration: 0.8 }}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "0.75rem",
+                padding: "0.625rem 1.25rem",
+                borderRadius: "9999px",
+                backdropFilter: "blur(16px)",
+                backgroundColor: "rgba(255, 255, 255, 0.1)",
+                border: "1px solid rgba(255, 255, 255, 0.2)",
+                marginBottom: "2rem",
+              }}
+            >
+              <span style={{ position: "relative", display: "flex", height: "10px", width: "10px" }}>
+                <span style={{
+                  position: "absolute",
+                  height: "100%",
+                  width: "100%",
+                  borderRadius: "9999px",
+                  backgroundColor: "#60A5FA",
+                  opacity: 0.75,
+                  animation: "ping 1s cubic-bezier(0, 0, 0.2, 1) infinite",
+                }} />
+                <span style={{
+                  position: "relative",
+                  display: "inline-flex",
+                  borderRadius: "9999px",
+                  height: "10px",
+                  width: "10px",
+                  backgroundColor: "#3B82F6",
+                }} />
+              </span>
+              <span style={{ color: "white", fontSize: "0.875rem", fontWeight: "600" }}>
+                Live in Clinical Beta
+              </span>
+              <span style={{ color: "#93C5FD", fontSize: "0.75rem", fontWeight: "500", borderLeft: "1px solid rgba(255, 255, 255, 0.2)", paddingLeft: "0.75rem" }}>
+                v2.4.1
+              </span>
+            </motion.div>
+
+            <motion.h1
+              initial={{ opacity: 0, y: 30 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.5, duration: 0.8 }}
+              style={{
+                fontFamily: "var(--font-space)",
+                fontSize: "clamp(2.5rem, 6vw, 5rem)",
+                fontWeight: "700",
+                lineHeight: "1.05",
+                letterSpacing: "-0.02em",
+                color: "white",
+                marginBottom: "2rem",
+              }}
+            >
+              Predict Thyroid{" "}
+              <span style={{
+                background: "linear-gradient(to right, #60A5FA, #22D3EE, #3B82F6)",
+                WebkitBackgroundClip: "text",
+                WebkitTextFillColor: "transparent",
+                backgroundClip: "text",
+              }}>
+                Cancer Recurrence
+              </span>{" "}
+              Before It Returns
+            </motion.h1>
+
+            <motion.p
+              initial={{ opacity: 0, y: 30 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.7, duration: 0.8 }}
+              style={{
+                color: "rgba(255, 255, 255, 0.8)",
+                fontSize: "clamp(1rem, 1.5vw, 1.25rem)",
+                lineHeight: "1.6",
+                marginBottom: "2rem",
+                maxWidth: "600px",
+                fontWeight: "300",
+              }}
+            >
+              Enterprise-grade{" "}
+              <span style={{ color: "white", fontWeight: "500" }}>explainable AI</span> trained
+              on federated hospital networks with complete patient privacy.
+            </motion.p>
+
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.9 }}
+              style={{ display: "flex", flexWrap: "wrap", gap: "0.75rem", marginBottom: "2.5rem" }}
+            >
+              {badges.map(({ icon: Icon, text }) => (
+                <div
+                  key={text}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "0.625rem",
+                    padding: "0.625rem 1.25rem",
+                    borderRadius: "9999px",
+                    backdropFilter: "blur(16px)",
+                    backgroundColor: "rgba(255, 255, 255, 0.1)",
+                    border: "1px solid rgba(255, 255, 255, 0.2)",
+                    color: "white",
+                    fontSize: "0.875rem",
+                    fontWeight: "500",
+                  }}
+                >
+                  <Icon size={16} style={{ color: "#93C5FD" }} />
+                  {text}
+                </div>
+              ))}
+            </motion.div>
+
+            <motion.div
+              initial={{ opacity: 0, y: 30 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 1.1, duration: 0.8 }}
+              style={{ display: "flex", flexWrap: "wrap", gap: "1rem", marginBottom: "3rem" }}
+            >
+              <Link
+                href="/dashboard"
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "0.75rem",
+                  padding: "1rem 2rem",
+                  borderRadius: "1rem",
+                  fontWeight: "700",
+                  color: "white",
+                  fontSize: "1rem",
+                  background: "linear-gradient(to right, #3B82F6, #2563EB)",
+                  boxShadow: "0 20px 50px rgba(59, 130, 246, 0.5)",
+                  textDecoration: "none",
+                  transition: "all 0.3s",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.transform = "scale(1.05)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = "scale(1)";
+                }}
+              >
+                Launch Dashboard
+                <ArrowRight size={20} />
+              </Link>
+              <button style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: "0.75rem",
+                padding: "1rem 2rem",
+                borderRadius: "1rem",
+                fontWeight: "700",
+                color: "white",
+                fontSize: "1rem",
+                backdropFilter: "blur(16px)",
+                backgroundColor: "rgba(255, 255, 255, 0.1)",
+                border: "2px solid rgba(255, 255, 255, 0.3)",
+                cursor: "pointer",
+              }}>
+                <div style={{
+                  width: "32px",
+                  height: "32px",
+                  borderRadius: "9999px",
+                  backgroundColor: "rgba(255, 255, 255, 0.2)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}>
+                  <Play size={13} fill="white" color="white" style={{ marginLeft: "2px" }} />
+                </div>
+                Watch Demo
+              </button>
+            </motion.div>
+
+            <motion.div
+              initial={{ opacity: 0, y: 30 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 1.3, duration: 0.8 }}
+              style={{
+                display: "flex",
+                gap: "3rem",
+                paddingTop: "2rem",
+                borderTop: "1px solid rgba(255, 255, 255, 0.2)",
+                flexWrap: "wrap",
+              }}
+            >
+              {stats.map((stat) => (
+                <div key={stat.label}>
+                  <div style={{
+                    fontFamily: "var(--font-space)",
+                    fontSize: "clamp(1.75rem, 3vw, 2.5rem)",
+                    fontWeight: "700",
+                    color: "white",
+                    lineHeight: "1",
+                  }}>
+                    {stat.value}
+                  </div>
+                  <div style={{ color: "rgba(255, 255, 255, 0.7)", fontSize: "0.875rem", marginTop: "0.5rem", fontWeight: "500" }}>
+                    {stat.label}
+                  </div>
+                </div>
+              ))}
+            </motion.div>
+          </div>
+
+          <div className="hero-preview-wrapper" style={{ display: "none" }}>
+            <DashboardPreview />
+          </div>
+        </div>
+      </div>
+
+      <style jsx>{`
+        @media (min-width: 1024px) {
+          .hero-grid {
+            grid-template-columns: 1.2fr 1fr !important;
+          }
+          .hero-preview-wrapper {
+            display: block !important;
+          }
+        }
+      `}</style>
+    </section>
+  );
+}

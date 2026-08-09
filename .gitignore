@@ -1,0 +1,47 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+venv/
+env/
+.env
+
+# Node.js
+recura-frontend/node_modules/
+recura-frontend/.next/
+recura-frontend/out/
+recura-frontend/build/
+recura-frontend/.env.local
+recura-frontend/.env.production
+node_modules/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Next.js
+.next/
+out/
+next-env.d.ts
+
+# Backend
+*.h5.backup
+old_*.py
+app-LAPTOP-*.py

@@ -1,0 +1,11 @@
+Age,Response,Physical_Examination,T,N,Risk,Pathology
+27,Indeterminate,Single nodular goiter-left,T1a,N0,Low,Micropapillary
+34,Excellent,Multinodular goiter,T1a,N0,Low,Micropapillary
+62,Structural Incomplete,Multinodular goiter,T4a,N1b,High,Hurthel cell
+45,Excellent,Normal,T1b,N0,Low,Papillary
+70,Structural Incomplete,Diffuse goiter,T4b,N1b,High,Hurthel cell
+38,Excellent,Single nodular goiter-right,T1a,N0,Low,Micropapillary
+55,Biochemical Incomplete,Multinodular goiter,T3a,N1a,Intermediate,Follicular
+41,Indeterminate,Single nodular goiter-left,T2,N0,Intermediate,Papillary
+65,Structural Incomplete,Multinodular goiter,T3b,N1b,High,Follicular
+30,Excellent,Normal,T1a,N0,Low,Papillary
