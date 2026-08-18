@@ -1,47 +1,35 @@
-# Python
+﻿# Python
 __pycache__/
-*.pyc
-*.pyo
-*.pyd
-.Python
-*.so
-*.egg
-*.egg-info/
-dist/
-build/
+*.py[cod]
 venv/
 env/
-.env
+.venv/
 
-# Node.js
+# Databases (patient data - NEVER commit!)
+*.db
+*.sqlite
+recura_history.db
+recura_alerts.db
+
+# Config with secrets
+alert_config.json
+.env
+.env.local
+
+# Frontend
 recura-frontend/node_modules/
 recura-frontend/.next/
 recura-frontend/out/
-recura-frontend/build/
-recura-frontend/.env.local
-recura-frontend/.env.production
-node_modules/
+
+# ML artifacts
+catboost_info/
+*.h5
+*.pkl
 
 # IDE
 .vscode/
 .idea/
-*.swp
-*.swo
 .DS_Store
-Thumbs.db
 
 # Logs
 *.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-
-# Next.js
-.next/
-out/
-next-env.d.ts
-
-# Backend
-*.h5.backup
-old_*.py
-app-LAPTOP-*.py
