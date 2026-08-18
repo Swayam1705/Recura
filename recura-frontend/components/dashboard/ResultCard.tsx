@@ -1,7 +1,9 @@
 "use client";
 
+import { useState } from "react";
 import { motion } from "framer-motion";
-import { AlertTriangle, CheckCircle, AlertCircle, TrendingUp, Download, Sparkles } from "lucide-react";
+import { AlertTriangle, CheckCircle, AlertCircle, TrendingUp, Download, Sparkles, Loader2, FileCheck, FileText } from "lucide-react";
+import { generateClinicalReport, PatientInput } from "@/lib/generateReport";
 
 const riskConfig = {
   low: {
@@ -38,13 +40,35 @@ const riskConfig = {
 
 interface ResultCardProps {
   result: any;
+  patientInput?: PatientInput;
   onExportPDF?: () => void;
 }
 
-export default function ResultCard({ result, onExportPDF }: ResultCardProps) {
+export default function ResultCard({ result, patientInput, onExportPDF }: ResultCardProps) {
+  const [exportState, setExportState] = useState<"idle" | "generating" | "success" | "error">("idle");
+  const [exportMode, setExportMode] = useState<"clinical" | "technical">("clinical");
+
   const config = riskConfig[result.riskLevel as keyof typeof riskConfig];
   const Icon = config.icon;
   const probability = Math.round(result.recurrenceProbability * 100);
+
+  const handleExport = async (includeTechnical: boolean = false) => {
+    if (!patientInput) {
+      alert("Patient data not available. Please run a new prediction.");
+      return;
+    }
+    setExportMode(includeTechnical ? "technical" : "clinical");
+    setExportState("generating");
+    try {
+      await generateClinicalReport(patientInput, result, "shap-chart", includeTechnical);
+      setExportState("success");
+      setTimeout(() => setExportState("idle"), 3000);
+    } catch (err) {
+      console.error("PDF generation failed:", err);
+      setExportState("error");
+      setTimeout(() => setExportState("idle"), 3000);
+    }
+  };
 
   return (
     <motion.div
@@ -157,13 +181,16 @@ export default function ResultCard({ result, onExportPDF }: ResultCardProps) {
         </div>
       </div>
 
-      <div style={{
-        backgroundColor: "white",
-        border: "1px solid #E5E7EB",
-        borderRadius: "1rem",
-        padding: "1.5rem",
-        boxShadow: "0 1px 3px rgba(0,0,0,0.05)",
-      }}>
+      <div
+        id="shap-chart"
+        style={{
+          backgroundColor: "white",
+          border: "1px solid #E5E7EB",
+          borderRadius: "1rem",
+          padding: "1.5rem",
+          boxShadow: "0 1px 3px rgba(0,0,0,0.05)",
+        }}
+      >
         <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "1.25rem" }}>
           <div style={{
             width: "32px",
@@ -260,36 +287,154 @@ export default function ResultCard({ result, onExportPDF }: ResultCardProps) {
         </div>
       </div>
 
-      <button
-        onClick={onExportPDF}
-        style={{
-          width: "100%",
-          padding: "0.875rem",
-          borderRadius: "12px",
-          border: "2px solid #E5E7EB",
-          color: "#374151",
-          backgroundColor: "white",
-          fontWeight: "600",
-          fontSize: "0.875rem",
-          cursor: "pointer",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          gap: "0.5rem",
-          transition: "all 0.2s",
-        }}
-        onMouseEnter={(e) => {
-          e.currentTarget.style.backgroundColor = "#F9FAFB";
-          e.currentTarget.style.borderColor = "#D1D5DB";
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.backgroundColor = "white";
-          e.currentTarget.style.borderColor = "#E5E7EB";
-        }}
-      >
-        <Download size={16} />
-        Export Clinical Report (PDF)
-      </button>
+      {/* ═══════════════════════════════════════════════════════════
+          EXPORT SECTION — Two-button layout
+          ═══════════════════════════════════════════════════════════ */}
+      <div style={{
+        backgroundColor: "white",
+        border: "1px solid #E5E7EB",
+        borderRadius: "1rem",
+        padding: "1.25rem",
+        boxShadow: "0 1px 3px rgba(0,0,0,0.05)",
+        display: "flex",
+        flexDirection: "column",
+        gap: "0.75rem",
+      }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.25rem" }}>
+          <FileText size={16} color="#0F766E" />
+          <h4 style={{
+            fontFamily: "var(--font-space)",
+            fontWeight: "700",
+            color: "#111827",
+            fontSize: "0.95rem",
+          }}>
+            Export Report
+          </h4>
+        </div>
+
+        {/* PRIMARY: Clinical Report */}
+        <button
+          onClick={() => handleExport(false)}
+          disabled={exportState === "generating"}
+          style={{
+            width: "100%",
+            padding: "0.875rem",
+            borderRadius: "12px",
+            border: "none",
+            color: "white",
+            background:
+              exportState === "success" && exportMode === "clinical"
+                ? "linear-gradient(135deg, #10B981, #059669)"
+                : exportState === "error" && exportMode === "clinical"
+                ? "linear-gradient(135deg, #EF4444, #DC2626)"
+                : "linear-gradient(135deg, #0F766E, #0D9488)",
+            fontWeight: "600",
+            fontSize: "0.875rem",
+            cursor: exportState === "generating" ? "not-allowed" : "pointer",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: "0.5rem",
+            transition: "all 0.2s",
+            boxShadow: "0 10px 25px rgba(15, 118, 110, 0.25)",
+            opacity: exportState === "generating" ? 0.7 : 1,
+          }}
+          onMouseEnter={(e) => {
+            if (exportState === "idle") e.currentTarget.style.transform = "scale(1.02)";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.transform = "scale(1)";
+          }}
+        >
+          {exportState === "generating" && exportMode === "clinical" ? (
+            <>
+              <Loader2 size={16} className="animate-spin" />
+              Generating Clinical Report...
+            </>
+          ) : exportState === "success" && exportMode === "clinical" ? (
+            <>
+              <FileCheck size={16} />
+              Clinical Report Downloaded!
+            </>
+          ) : exportState === "error" && exportMode === "clinical" ? (
+            <>
+              <Download size={16} />
+              Export Failed - Click to Retry
+            </>
+          ) : (
+            <>
+              <Download size={16} />
+              Export Clinical Report (PDF)
+            </>
+          )}
+        </button>
+
+        {/* SECONDARY: Full Report with Technical Appendix */}
+        <button
+          onClick={() => handleExport(true)}
+          disabled={exportState === "generating"}
+          style={{
+            width: "100%",
+            padding: "0.625rem",
+            borderRadius: "10px",
+            border: "1.5px solid #E5E7EB",
+            color:
+              exportState === "success" && exportMode === "technical"
+                ? "#059669"
+                : exportState === "error" && exportMode === "technical"
+                ? "#DC2626"
+                : "#6B7280",
+            backgroundColor: "white",
+            fontWeight: "500",
+            fontSize: "0.75rem",
+            cursor: exportState === "generating" ? "not-allowed" : "pointer",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: "0.375rem",
+            transition: "all 0.2s",
+          }}
+          onMouseEnter={(e) => {
+            if (exportState !== "generating") {
+              e.currentTarget.style.borderColor = "#0F766E";
+              e.currentTarget.style.color = "#0F766E";
+            }
+          }}
+          onMouseLeave={(e) => {
+            if (exportState === "idle") {
+              e.currentTarget.style.borderColor = "#E5E7EB";
+              e.currentTarget.style.color = "#6B7280";
+            }
+          }}
+        >
+          {exportState === "generating" && exportMode === "technical" ? (
+            <>
+              <Loader2 size={12} className="animate-spin" />
+              Generating Full Report...
+            </>
+          ) : exportState === "success" && exportMode === "technical" ? (
+            <>
+              <FileCheck size={12} />
+              Full Report Downloaded!
+            </>
+          ) : (
+            <>
+              <Download size={12} />
+              Export with Technical Appendix (for audit/research)
+            </>
+          )}
+        </button>
+
+        <p style={{
+          color: "#9CA3AF",
+          fontSize: "0.7rem",
+          textAlign: "center",
+          marginTop: "0.25rem",
+          fontStyle: "italic",
+        }}>
+          Clinical report: doctor-friendly summary. Technical appendix adds SHAP scores & model metadata.
+        </p>
+      </div>
     </motion.div>
   );
 }
