@@ -1,195 +1,445 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import {
-  Activity,
-  TrendingUp,
-  Brain,
-  CheckCircle2,
-  AlertCircle,
-  Sparkles,
-} from "lucide-react";
+import { Brain, Shield, Zap, Network, Sparkles } from "lucide-react";
 
-const shapData = [
-  { name: "Tumor Size", value: 78, color: "bg-red-400" },
-  { name: "Lymph Nodes", value: 65, color: "bg-red-400" },
-  { name: "T Stage", value: 52, color: "bg-orange-400" },
-  { name: "Age", value: 34, color: "bg-amber-400" },
-  { name: "Focality", value: 22, color: "bg-emerald-400" },
-];
+interface Particle {
+  left: number;
+  top: number;
+  color: string;
+  duration: number;
+  delay: number;
+}
 
 export default function DashboardPreview() {
-  return (
-    <div className="relative">
-      <div className="absolute -inset-6 bg-gradient-to-br from-blue-400/20 via-cyan-400/20 to-purple-400/20 rounded-3xl blur-2xl" />
+  const [mounted, setMounted] = useState(false);
+  const [particles, setParticles] = useState<Particle[]>([]);
 
+  useEffect(() => {
+    setMounted(true);
+    const colors = ["#3B82F6", "#06B6D4", "#8B5CF6"];
+    const generated: Particle[] = [];
+    for (let i = 0; i < 15; i++) {
+      generated.push({
+        left: 10 + Math.random() * 80,
+        top: 20 + Math.random() * 60,
+        color: colors[i % 3],
+        duration: 3 + Math.random() * 2,
+        delay: Math.random() * 2,
+      });
+    }
+    setParticles(generated);
+  }, []);
+
+  if (!mounted) {
+    return <div style={{ position: "relative", width: "100%", height: "600px" }} />;
+  }
+
+  return (
+    <div style={{ position: "relative", width: "100%", height: "600px" }}>
+      {/* Central glowing orb */}
+      <div style={{
+        position: "absolute",
+        top: "50%",
+        left: "50%",
+        transform: "translate(-50%, -50%)",
+        width: "300px",
+        height: "300px",
+      }}>
+        {/* Outer pulsing rings */}
+        {[0, 1, 2, 3].map((i) => (
+          <motion.div
+            key={i}
+            initial={{ scale: 0.5, opacity: 0 }}
+            animate={{
+              scale: [0.5, 2, 0.5],
+              opacity: [0.6, 0, 0.6],
+            }}
+            transition={{
+              duration: 4,
+              delay: i * 1,
+              repeat: Infinity,
+              ease: "easeInOut",
+            }}
+            style={{
+              position: "absolute",
+              inset: 0,
+              borderRadius: "50%",
+              border: "2px solid rgba(59, 130, 246, 0.4)",
+              pointerEvents: "none",
+            }}
+          />
+        ))}
+
+        {/* Rotating gradient ring */}
+        <motion.div
+          animate={{ rotate: 360 }}
+          transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
+          style={{
+            position: "absolute",
+            inset: 0,
+            borderRadius: "50%",
+            background: "conic-gradient(from 0deg, #3B82F6, #06B6D4, #8B5CF6, #3B82F6)",
+            padding: "3px",
+            opacity: 0.8,
+          }}
+        >
+          <div style={{
+            width: "100%",
+            height: "100%",
+            borderRadius: "50%",
+            background: "radial-gradient(circle at 30% 30%, #1E293B, #0F172A)",
+          }} />
+        </motion.div>
+
+        {/* Counter-rotating inner ring */}
+        <motion.div
+          animate={{ rotate: -360 }}
+          transition={{ duration: 15, repeat: Infinity, ease: "linear" }}
+          style={{
+            position: "absolute",
+            inset: "30px",
+            borderRadius: "50%",
+            border: "2px dashed rgba(6, 182, 212, 0.5)",
+          }}
+        />
+
+        {/* Central brain icon with glow */}
+        <motion.div
+          animate={{
+            scale: [1, 1.1, 1],
+            boxShadow: [
+              "0 0 40px rgba(59, 130, 246, 0.5)",
+              "0 0 80px rgba(59, 130, 246, 0.8)",
+              "0 0 40px rgba(59, 130, 246, 0.5)",
+            ],
+          }}
+          transition={{ duration: 3, repeat: Infinity }}
+          style={{
+            position: "absolute",
+            top: "50%",
+            left: "50%",
+            transform: "translate(-50%, -50%)",
+            width: "120px",
+            height: "120px",
+            borderRadius: "50%",
+            background: "linear-gradient(135deg, #3B82F6, #1D4ED8)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <Brain size={56} color="white" strokeWidth={1.5} />
+        </motion.div>
+
+        {/* Data particles orbiting */}
+        {[
+          { angle: 0, color: "#3B82F6", delay: 0 },
+          { angle: 60, color: "#06B6D4", delay: 0.5 },
+          { angle: 120, color: "#8B5CF6", delay: 1 },
+          { angle: 180, color: "#EC4899", delay: 1.5 },
+          { angle: 240, color: "#F59E0B", delay: 2 },
+          { angle: 300, color: "#10B981", delay: 2.5 },
+        ].map((particle, i) => (
+          <motion.div
+            key={i}
+            animate={{
+              rotate: 360,
+            }}
+            transition={{
+              duration: 10,
+              delay: particle.delay,
+              repeat: Infinity,
+              ease: "linear",
+            }}
+            style={{
+              position: "absolute",
+              top: "50%",
+              left: "50%",
+              width: "0",
+              height: "0",
+              transformOrigin: "0 0",
+            }}
+          >
+            <motion.div
+              animate={{
+                scale: [1, 1.5, 1],
+                opacity: [0.8, 1, 0.8],
+              }}
+              transition={{
+                duration: 2,
+                delay: particle.delay,
+                repeat: Infinity,
+              }}
+              style={{
+                position: "absolute",
+                width: "12px",
+                height: "12px",
+                borderRadius: "50%",
+                backgroundColor: particle.color,
+                boxShadow: `0 0 20px ${particle.color}`,
+                left: `${Math.cos((particle.angle * Math.PI) / 180) * 180}px`,
+                top: `${Math.sin((particle.angle * Math.PI) / 180) * 180}px`,
+                transform: "translate(-50%, -50%)",
+              }}
+            />
+          </motion.div>
+        ))}
+      </div>
+
+      {/* Floating info cards */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.8 }}
-        className="relative bg-white rounded-3xl border border-gray-200 shadow-2xl shadow-blue-500/20 overflow-hidden"
+        transition={{ delay: 1, duration: 0.8 }}
+        style={{
+          position: "absolute",
+          top: "10%",
+          left: "5%",
+          backdropFilter: "blur(20px)",
+          backgroundColor: "rgba(255, 255, 255, 0.1)",
+          border: "1px solid rgba(255, 255, 255, 0.2)",
+          borderRadius: "16px",
+          padding: "1rem 1.25rem",
+          display: "flex",
+          alignItems: "center",
+          gap: "0.75rem",
+        }}
       >
-        <div className="h-11 bg-gray-50 border-b border-gray-200 flex items-center px-4 gap-2">
-          <div className="flex gap-1.5">
-            <div className="w-3 h-3 rounded-full bg-red-400"></div>
-            <div className="w-3 h-3 rounded-full bg-yellow-400"></div>
-            <div className="w-3 h-3 rounded-full bg-green-400"></div>
+        <motion.div
+          animate={{
+            scale: [1, 1.2, 1],
+          }}
+          transition={{ duration: 2, repeat: Infinity }}
+          style={{
+            width: "40px",
+            height: "40px",
+            borderRadius: "12px",
+            background: "linear-gradient(135deg, #10B981, #059669)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            boxShadow: "0 0 20px rgba(16, 185, 129, 0.5)",
+          }}
+        >
+          <Shield size={20} color="white" />
+        </motion.div>
+        <div>
+          <div style={{ color: "white", fontSize: "0.75rem", fontWeight: "700" }}>
+            HIPAA Secured
           </div>
-          <div className="flex-1 flex justify-center">
-            <div className="bg-white border border-gray-200 rounded-md px-3 py-1 flex items-center gap-2 text-xs text-gray-500">
-              <div className="w-1.5 h-1.5 rounded-full bg-emerald-500"></div>
-              recura.app/dashboard
-            </div>
+          <div style={{ color: "rgba(255,255,255,0.6)", fontSize: "0.65rem" }}>
+            Zero data leakage
           </div>
-        </div>
-
-        <div className="p-6 bg-gradient-to-br from-white to-blue-50/30 space-y-4">
-          <motion.div
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: 0.3 }}
-            className="flex items-center justify-between"
-          >
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-600 to-blue-700 flex items-center justify-center">
-                <Activity size={16} className="text-white" strokeWidth={2.5} />
-              </div>
-              <div>
-                <div className="text-gray-900 font-bold text-sm">Patient #1284</div>
-                <div className="text-gray-500 text-[10px]">Analyzed 2 sec ago</div>
-              </div>
-            </div>
-            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 border border-emerald-200">
-              <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></div>
-              <span className="text-emerald-700 text-[10px] font-bold">LIVE</span>
-            </div>
-          </motion.div>
-
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ delay: 0.4 }}
-            className="bg-gradient-to-br from-red-50 to-orange-50 border-2 border-red-200 rounded-2xl p-5"
-          >
-            <div className="flex items-start justify-between mb-3">
-              <div className="flex items-center gap-2">
-                <div className="w-9 h-9 rounded-xl bg-red-100 flex items-center justify-center">
-                  <AlertCircle size={18} className="text-red-600" />
-                </div>
-                <div>
-                  <div className="font-bold text-red-700 text-base">High Risk</div>
-                  <div className="text-red-600 text-xs">Recurrence detected</div>
-                </div>
-              </div>
-              <div className="text-right">
-                <motion.div
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ delay: 0.7 }}
-                  className="font-display text-3xl font-bold text-red-700"
-                >
-                  87%
-                </motion.div>
-                <div className="text-red-600 text-[10px] font-medium">Confidence 94%</div>
-              </div>
-            </div>
-            <div className="w-full bg-white/60 rounded-full h-2 overflow-hidden">
-              <motion.div
-                initial={{ width: 0 }}
-                animate={{ width: "87%" }}
-                transition={{ delay: 0.6, duration: 1 }}
-                className="h-full rounded-full bg-gradient-to-r from-red-500 to-orange-500"
-              />
-            </div>
-          </motion.div>
-
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.5 }}
-            className="bg-white border border-gray-200 rounded-2xl p-4"
-          >
-            <div className="flex items-center gap-2 mb-3">
-              <div className="w-6 h-6 rounded-md bg-blue-50 flex items-center justify-center">
-                <TrendingUp size={12} className="text-blue-600" />
-              </div>
-              <div className="font-bold text-gray-900 text-xs">
-                SHAP Feature Importance
-              </div>
-            </div>
-            <div className="space-y-2">
-              {shapData.map((item, i) => (
-                <motion.div
-                  key={item.name}
-                  initial={{ opacity: 0, x: -10 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: 0.7 + i * 0.1 }}
-                >
-                  <div className="flex justify-between text-[11px] mb-1">
-                    <span className="text-gray-600 font-medium">{item.name}</span>
-                    <span className="text-gray-900 font-bold">{item.value}%</span>
-                  </div>
-                  <div className="w-full bg-gray-100 rounded-full h-1.5 overflow-hidden">
-                    <motion.div
-                      initial={{ width: 0 }}
-                      animate={{ width: `${item.value}%` }}
-                      transition={{ delay: 0.8 + i * 0.1, duration: 0.8 }}
-                      className={`h-full rounded-full ${item.color}`}
-                    />
-                  </div>
-                </motion.div>
-              ))}
-            </div>
-          </motion.div>
-
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 1.2 }}
-            className="bg-blue-50 border border-blue-200 rounded-xl p-3 flex items-start gap-2"
-          >
-            <Sparkles size={14} className="text-blue-600 flex-shrink-0 mt-0.5" />
-            <div>
-              <div className="text-blue-900 text-xs font-bold mb-0.5">
-                AI Recommendation
-              </div>
-              <div className="text-blue-800 text-[11px] leading-snug">
-                Recommend TSH monitoring every 3 months. Schedule imaging within 6 months.
-              </div>
-            </div>
-          </motion.div>
         </div>
       </motion.div>
 
       <motion.div
-        initial={{ opacity: 0, scale: 0, x: 20, y: -20 }}
-        animate={{ opacity: 1, scale: 1, x: 0, y: 0 }}
-        transition={{ delay: 1.5, type: "spring" }}
-        className="absolute -top-4 -right-4 bg-white rounded-2xl shadow-xl border border-gray-200 p-3 flex items-center gap-2"
+        initial={{ opacity: 0, x: 20 }}
+        animate={{ opacity: 1, x: 0 }}
+        transition={{ delay: 1.3, duration: 0.8 }}
+        style={{
+          position: "absolute",
+          top: "20%",
+          right: "5%",
+          backdropFilter: "blur(20px)",
+          backgroundColor: "rgba(255, 255, 255, 0.1)",
+          border: "1px solid rgba(255, 255, 255, 0.2)",
+          borderRadius: "16px",
+          padding: "1rem 1.25rem",
+          display: "flex",
+          alignItems: "center",
+          gap: "0.75rem",
+        }}
       >
-        <div className="w-9 h-9 rounded-xl bg-emerald-50 flex items-center justify-center">
-          <CheckCircle2 size={18} className="text-emerald-600" />
-        </div>
+        <motion.div
+          animate={{
+            rotate: [0, 360],
+          }}
+          transition={{ duration: 8, repeat: Infinity, ease: "linear" }}
+          style={{
+            width: "40px",
+            height: "40px",
+            borderRadius: "12px",
+            background: "linear-gradient(135deg, #8B5CF6, #7C3AED)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            boxShadow: "0 0 20px rgba(139, 92, 246, 0.5)",
+          }}
+        >
+          <Network size={20} color="white" />
+        </motion.div>
         <div>
-          <div className="text-gray-900 font-bold text-xs">Federated Learning</div>
-          <div className="text-emerald-600 text-[10px] font-medium">156 hospitals synced</div>
+          <div style={{ color: "white", fontSize: "0.75rem", fontWeight: "700" }}>
+            Federated Learning
+          </div>
+          <div style={{ color: "rgba(255,255,255,0.6)", fontSize: "0.65rem" }}>
+            156 hospitals synced
+          </div>
         </div>
       </motion.div>
 
       <motion.div
-        initial={{ opacity: 0, scale: 0, x: -20, y: 20 }}
-        animate={{ opacity: 1, scale: 1, x: 0, y: 0 }}
-        transition={{ delay: 1.7, type: "spring" }}
-        className="absolute -bottom-4 -left-4 bg-white rounded-2xl shadow-xl border border-gray-200 p-3 flex items-center gap-2"
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 1.6, duration: 0.8 }}
+        style={{
+          position: "absolute",
+          bottom: "20%",
+          left: "10%",
+          backdropFilter: "blur(20px)",
+          backgroundColor: "rgba(255, 255, 255, 0.1)",
+          border: "1px solid rgba(255, 255, 255, 0.2)",
+          borderRadius: "16px",
+          padding: "1rem 1.25rem",
+          display: "flex",
+          alignItems: "center",
+          gap: "0.75rem",
+        }}
       >
-        <div className="w-9 h-9 rounded-xl bg-purple-50 flex items-center justify-center">
-          <Brain size={18} className="text-purple-600" />
-        </div>
+        <motion.div
+          animate={{
+            boxShadow: [
+              "0 0 20px rgba(6, 182, 212, 0.5)",
+              "0 0 40px rgba(6, 182, 212, 0.8)",
+              "0 0 20px rgba(6, 182, 212, 0.5)",
+            ],
+          }}
+          transition={{ duration: 2, repeat: Infinity }}
+          style={{
+            width: "40px",
+            height: "40px",
+            borderRadius: "12px",
+            background: "linear-gradient(135deg, #06B6D4, #0891B2)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <Zap size={20} color="white" />
+        </motion.div>
         <div>
-          <div className="text-gray-900 font-bold text-xs">2.3s Analysis</div>
-          <div className="text-purple-600 text-[10px] font-medium">99.2% accurate</div>
+          <div style={{ color: "white", fontSize: "0.75rem", fontWeight: "700" }}>
+            98.7% Accuracy
+          </div>
+          <div style={{ color: "rgba(255,255,255,0.6)", fontSize: "0.65rem" }}>
+            Deep 1D-CNN
+          </div>
         </div>
       </motion.div>
+
+      <motion.div
+        initial={{ opacity: 0, x: -20 }}
+        animate={{ opacity: 1, x: 0 }}
+        transition={{ delay: 1.9, duration: 0.8 }}
+        style={{
+          position: "absolute",
+          bottom: "10%",
+          right: "10%",
+          backdropFilter: "blur(20px)",
+          backgroundColor: "rgba(255, 255, 255, 0.1)",
+          border: "1px solid rgba(255, 255, 255, 0.2)",
+          borderRadius: "16px",
+          padding: "1rem 1.25rem",
+          display: "flex",
+          alignItems: "center",
+          gap: "0.75rem",
+        }}
+      >
+        <motion.div
+          animate={{
+            scale: [1, 1.15, 1],
+          }}
+          transition={{ duration: 1.5, repeat: Infinity }}
+          style={{
+            width: "40px",
+            height: "40px",
+            borderRadius: "12px",
+            background: "linear-gradient(135deg, #EC4899, #DB2777)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            boxShadow: "0 0 20px rgba(236, 72, 153, 0.5)",
+          }}
+        >
+          <Sparkles size={20} color="white" />
+        </motion.div>
+        <div>
+          <div style={{ color: "white", fontSize: "0.75rem", fontWeight: "700" }}>
+            Explainable AI
+          </div>
+          <div style={{ color: "rgba(255,255,255,0.6)", fontSize: "0.65rem" }}>
+            SHAP + LIME
+          </div>
+        </div>
+      </motion.div>
+
+      {/* Connection lines - SVG */}
+      <svg
+        style={{
+          position: "absolute",
+          inset: 0,
+          width: "100%",
+          height: "100%",
+          pointerEvents: "none",
+          opacity: 0.2,
+        }}
+      >
+        <defs>
+          <linearGradient id="lineGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="#3B82F6" />
+            <stop offset="100%" stopColor="#8B5CF6" />
+          </linearGradient>
+        </defs>
+        {[
+          { x1: "15%", y1: "20%", x2: "50%", y2: "50%" },
+          { x1: "85%", y1: "30%", x2: "50%", y2: "50%" },
+          { x1: "20%", y1: "80%", x2: "50%", y2: "50%" },
+          { x1: "80%", y1: "85%", x2: "50%", y2: "50%" },
+        ].map((line, i) => (
+          <motion.line
+            key={i}
+            x1={line.x1}
+            y1={line.y1}
+            x2={line.x2}
+            y2={line.y2}
+            stroke="url(#lineGrad)"
+            strokeWidth="1"
+            strokeDasharray="4 4"
+            initial={{ pathLength: 0 }}
+            animate={{ pathLength: 1 }}
+            transition={{ duration: 2, delay: i * 0.3, repeat: Infinity, repeatType: "reverse" }}
+          />
+        ))}
+      </svg>
+
+      {/* Small floating particles - client-only rendering */}
+      {particles.map((p, i) => (
+        <motion.div
+          key={i}
+          animate={{
+            y: [0, -30, 0],
+            opacity: [0, 1, 0],
+          }}
+          transition={{
+            duration: p.duration,
+            delay: p.delay,
+            repeat: Infinity,
+          }}
+          style={{
+            position: "absolute",
+            left: `${p.left}%`,
+            top: `${p.top}%`,
+            width: "4px",
+            height: "4px",
+            borderRadius: "50%",
+            backgroundColor: p.color,
+            boxShadow: `0 0 10px ${p.color}`,
+          }}
+        />
+      ))}
     </div>
   );
 }

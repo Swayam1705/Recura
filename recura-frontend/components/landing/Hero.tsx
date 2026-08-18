@@ -29,7 +29,7 @@ export default function Hero() {
           style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }}
         >
           <source
-            src="https://cdn.pixabay.com/video/2024/03/15/203960-923909579_large.mp4"
+            src="https://videos.pexels.com/video-files/3129957/3129957-uhd_3840_2160_25fps.mp4"
             type="video/mp4"
           />
         </video>
@@ -46,6 +46,43 @@ export default function Hero() {
         }} />
       </div>
 
+      <div style={{ position: "absolute", inset: 0, zIndex: 1, overflow: "hidden", pointerEvents: "none" }}>
+        <motion.div
+          animate={{
+            x: [0, 100, 0],
+            y: [0, -50, 0],
+          }}
+          transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
+          style={{
+            position: "absolute",
+            top: "25%",
+            left: "25%",
+            width: "600px",
+            height: "600px",
+            background: "rgba(59, 130, 246, 0.2)",
+            borderRadius: "50%",
+            filter: "blur(150px)",
+          }}
+        />
+        <motion.div
+          animate={{
+            x: [0, -100, 0],
+            y: [0, 50, 0],
+          }}
+          transition={{ duration: 25, repeat: Infinity, ease: "linear" }}
+          style={{
+            position: "absolute",
+            bottom: "25%",
+            right: "25%",
+            width: "500px",
+            height: "500px",
+            background: "rgba(6, 182, 212, 0.2)",
+            borderRadius: "50%",
+            filter: "blur(150px)",
+          }}
+        />
+      </div>
+
       <nav style={{
         position: "absolute",
         top: 0,
@@ -53,8 +90,8 @@ export default function Hero() {
         right: 0,
         zIndex: 50,
         backdropFilter: "blur(12px)",
-        backgroundColor: "rgba(255, 255, 255, 0.05)",
-        borderBottom: "1px solid rgba(255, 255, 255, 0.1)",
+        backgroundColor: "rgba(15, 23, 42, 0.3)",
+        borderBottom: "1px solid rgba(255, 255, 255, 0.08)",
       }}>
         <div style={{
           maxWidth: "1400px",
@@ -67,16 +104,16 @@ export default function Hero() {
         }}>
           <Link href="/" style={{ display: "flex", alignItems: "center", gap: "0.75rem", textDecoration: "none" }}>
             <div style={{
-              width: "48px",
-              height: "48px",
-              borderRadius: "16px",
+              width: "44px",
+              height: "44px",
+              borderRadius: "14px",
               background: "linear-gradient(135deg, #3B82F6, #1D4ED8)",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
               boxShadow: "0 8px 24px rgba(59, 130, 246, 0.5)",
             }}>
-              <svg viewBox="0 0 100 100" width="28" height="28">
+              <svg viewBox="0 0 100 100" width="26" height="26">
                 <path
                   d="M20 55 L35 55 L42 40 L52 68 L60 48 L67 55 L80 55"
                   stroke="white"
@@ -111,7 +148,7 @@ export default function Hero() {
             </div>
           </Link>
 
-          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", padding: "0.5rem 0.75rem", borderRadius: "9999px", backdropFilter: "blur(16px)", backgroundColor: "rgba(255, 255, 255, 0.1)", border: "1px solid rgba(255, 255, 255, 0.2)" }} className="hidden lg:flex">
+          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", padding: "0.5rem 0.75rem", borderRadius: "9999px", backdropFilter: "blur(16px)", backgroundColor: "rgba(255, 255, 255, 0.1)", border: "1px solid rgba(255, 255, 255, 0.15)" }} className="hidden lg:flex">
             {["Features", "How It Works", "Security", "Pricing"].map((item) => (
               <Link
                 key={item}
@@ -216,7 +253,7 @@ export default function Hero() {
                 borderRadius: "9999px",
                 backdropFilter: "blur(16px)",
                 backgroundColor: "rgba(255, 255, 255, 0.1)",
-                border: "1px solid rgba(255, 255, 255, 0.2)",
+                border: "1px solid rgba(255, 255, 255, 0.15)",
                 marginBottom: "2rem",
               }}
             >
@@ -308,7 +345,7 @@ export default function Hero() {
                     borderRadius: "9999px",
                     backdropFilter: "blur(16px)",
                     backgroundColor: "rgba(255, 255, 255, 0.1)",
-                    border: "1px solid rgba(255, 255, 255, 0.2)",
+                    border: "1px solid rgba(255, 255, 255, 0.15)",
                     color: "white",
                     fontSize: "0.875rem",
                     fontWeight: "500",
@@ -365,7 +402,7 @@ export default function Hero() {
                 fontSize: "1rem",
                 backdropFilter: "blur(16px)",
                 backgroundColor: "rgba(255, 255, 255, 0.1)",
-                border: "2px solid rgba(255, 255, 255, 0.3)",
+                border: "2px solid rgba(255, 255, 255, 0.2)",
                 cursor: "pointer",
               }}>
                 <div style={{
@@ -391,7 +428,7 @@ export default function Hero() {
                 display: "flex",
                 gap: "3rem",
                 paddingTop: "2rem",
-                borderTop: "1px solid rgba(255, 255, 255, 0.2)",
+                borderTop: "1px solid rgba(255, 255, 255, 0.15)",
                 flexWrap: "wrap",
               }}
             >
