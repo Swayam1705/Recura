@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Brain, Loader2 } from "lucide-react";
+import { Brain, Loader2, Sparkles } from "lucide-react";
+import PatientIdField from "./PatientIdField";
 
 const selectFields = [
   {
@@ -70,7 +71,7 @@ const selectFields = [
 ];
 
 interface PredictionFormProps {
-  onResult: (result: any) => void;
+  onResult: (result: any, patientInput?: any) => void;
   prefillData?: any;
 }
 
@@ -94,18 +95,41 @@ const labelStyle: React.CSSProperties = {
   marginBottom: "0.5rem",
 };
 
+const defaultFormData = {
+  Age: 45,
+  Response: "Excellent",
+  Physical_Examination: "Normal",
+  T: "T1a",
+  N: "N0",
+  Risk: "Low",
+  Pathology: "Papillary",
+};
+
 export default function PredictionForm({ onResult, prefillData }: PredictionFormProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [formData, setFormData] = useState({
-    Age: prefillData?.Age || 45,
-    Response: prefillData?.Response || "Excellent",
-    Physical_Examination: prefillData?.Physical_Examination || "Normal",
-    T: prefillData?.T || "T1a",
-    N: prefillData?.N || "N0",
-    Risk: prefillData?.Risk || "Low",
-    Pathology: prefillData?.Pathology || "Papillary",
-  });
+  const [formData, setFormData] = useState(defaultFormData);
+  const [prefilledFields, setPrefilledFields] = useState<Set<string>>(new Set());
+  const [patientId, setPatientId] = useState("");
+  const [patientMode, setPatientMode] = useState<"new" | "existing">("new");
+
+  useEffect(() => {
+    if (prefillData && prefillData._timestamp) {
+      const newData = { ...formData };
+      const filled = new Set<string>();
+
+      Object.keys(defaultFormData).forEach((key) => {
+        if (prefillData[key] !== undefined && prefillData[key] !== null) {
+          (newData as any)[key] = key === "Age" ? Number(prefillData[key]) : prefillData[key];
+          filled.add(key);
+        }
+      });
+
+      setFormData(newData);
+      setPrefilledFields(filled);
+      setTimeout(() => setPrefilledFields(new Set()), 3000);
+    }
+  }, [prefillData?._timestamp]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -113,6 +137,11 @@ export default function PredictionForm({ onResult, prefillData }: PredictionForm
       ...formData,
       [name]: name === "Age" ? Number(value) : value,
     });
+    if (prefilledFields.has(name)) {
+      const updated = new Set(prefilledFields);
+      updated.delete(name);
+      setPrefilledFields(updated);
+    }
   };
 
   const handleFocus = (e: React.FocusEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -121,7 +150,8 @@ export default function PredictionForm({ onResult, prefillData }: PredictionForm
   };
 
   const handleBlur = (e: React.FocusEvent<HTMLInputElement | HTMLSelectElement>) => {
-    e.target.style.borderColor = "#E5E7EB";
+    const isPrefilled = prefilledFields.has(e.target.name);
+    e.target.style.borderColor = isPrefilled ? "#0F766E" : "#E5E7EB";
     e.target.style.boxShadow = "none";
   };
 
@@ -131,10 +161,15 @@ export default function PredictionForm({ onResult, prefillData }: PredictionForm
     setError(null);
 
     try {
+      const payload = {
+        ...formData,
+        patient_id: patientId.trim() || null,
+      };
+
       const response = await fetch("http://127.0.0.1:8000/predict", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData),
+        body: JSON.stringify(payload),
       });
 
       if (!response.ok) {
@@ -142,13 +177,23 @@ export default function PredictionForm({ onResult, prefillData }: PredictionForm
       }
 
       const result = await response.json();
-      onResult(result);
+      onResult(result, formData);
     } catch (err: any) {
       setError(`Cannot connect to backend. Make sure FastAPI is running at http://127.0.0.1:8000`);
       console.error("Prediction error:", err);
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const getFieldStyle = (fieldName: string, extra: React.CSSProperties = {}): React.CSSProperties => {
+    const isPrefilled = prefilledFields.has(fieldName);
+    return {
+      ...inputStyle,
+      ...extra,
+      borderColor: isPrefilled ? "#0F766E" : "#E5E7EB",
+      backgroundColor: isPrefilled ? "#F0FDFA" : "white",
+    };
   };
 
   return (
@@ -170,37 +215,75 @@ export default function PredictionForm({ onResult, prefillData }: PredictionForm
         marginBottom: "1.5rem",
         paddingBottom: "1.25rem",
         borderBottom: "1px solid #F3F4F6",
+        justifyContent: "space-between",
       }}>
-        <div style={{
-          width: "44px",
-          height: "44px",
-          borderRadius: "12px",
-          backgroundColor: "#EFF6FF",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-        }}>
-          <Brain size={22} color="#2563EB" />
-        </div>
-        <div>
-          <h2 style={{
-            fontFamily: "var(--font-space)",
-            fontWeight: "700",
-            color: "#111827",
-            fontSize: "1.125rem",
+        <div style={{ display: "flex", alignItems: "center", gap: "0.875rem" }}>
+          <div style={{
+            width: "44px",
+            height: "44px",
+            borderRadius: "12px",
+            backgroundColor: "#EFF6FF",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
           }}>
-            Patient Clinical Data
-          </h2>
-          <p style={{ color: "#6B7280", fontSize: "0.8rem", marginTop: "2px" }}>
-            Powered by trained Deep 1D-CNN model
-          </p>
+            <Brain size={22} color="#2563EB" />
+          </div>
+          <div>
+            <h2 style={{
+              fontFamily: "var(--font-space)",
+              fontWeight: "700",
+              color: "#111827",
+              fontSize: "1.125rem",
+            }}>
+              Patient Clinical Data
+            </h2>
+            <p style={{ color: "#6B7280", fontSize: "0.8rem", marginTop: "2px" }}>
+              Powered by trained Deep 1D-CNN model
+            </p>
+          </div>
         </div>
+
+        {prefilledFields.size > 0 && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "0.375rem",
+              padding: "0.375rem 0.75rem",
+              background: "linear-gradient(135deg, #ECFDF5, #F0FDFA)",
+              border: "1px solid #A7F3D0",
+              borderRadius: "9999px",
+              fontSize: "0.7rem",
+              color: "#065F46",
+              fontWeight: "600",
+            }}
+          >
+            <Sparkles size={11} />
+            {prefilledFields.size} FIELD{prefilledFields.size !== 1 ? "S" : ""} AI-FILLED
+          </motion.div>
+        )}
       </div>
 
       <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
+        {/* Patient ID Field */}
+        <PatientIdField
+          value={patientId}
+          onChange={setPatientId}
+          mode={patientMode}
+          onModeChange={setPatientMode}
+        />
+
         <div>
           <label style={labelStyle}>
             Patient Age <span style={{ color: "#9CA3AF", fontWeight: "400" }}>(years)</span>
+            {prefilledFields.has("Age") && (
+              <span style={{ marginLeft: "0.375rem", fontSize: "0.65rem", color: "#0F766E", fontWeight: "700" }}>
+                ✨ AI
+              </span>
+            )}
           </label>
           <input
             type="number"
@@ -212,7 +295,7 @@ export default function PredictionForm({ onResult, prefillData }: PredictionForm
             min={1}
             max={100}
             required
-            style={inputStyle}
+            style={getFieldStyle("Age")}
           />
         </div>
 
@@ -223,14 +306,21 @@ export default function PredictionForm({ onResult, prefillData }: PredictionForm
         }}>
           {selectFields.map((field) => (
             <div key={field.name}>
-              <label style={labelStyle}>{field.label}</label>
+              <label style={labelStyle}>
+                {field.label}
+                {prefilledFields.has(field.name) && (
+                  <span style={{ marginLeft: "0.375rem", fontSize: "0.65rem", color: "#0F766E", fontWeight: "700" }}>
+                    ✨ AI
+                  </span>
+                )}
+              </label>
               <select
                 name={field.name}
                 value={formData[field.name as keyof typeof formData]}
                 onChange={handleChange}
                 onFocus={handleFocus}
                 onBlur={handleBlur}
-                style={{ ...inputStyle, cursor: "pointer" }}
+                style={getFieldStyle(field.name, { cursor: "pointer" })}
               >
                 {field.options.map((opt) => (
                   <option key={opt.value} value={opt.value}>

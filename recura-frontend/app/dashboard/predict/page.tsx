@@ -2,16 +2,30 @@
 
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Brain, Activity } from "lucide-react";
+import { Brain } from "lucide-react";
 import PredictionForm from "@/components/dashboard/PredictionForm";
 import ResultCard from "@/components/dashboard/ResultCard";
+import NoteParser from "@/components/dashboard/NoteParser";
 
 export default function PredictPage() {
   const [result, setResult] = useState<any>(null);
   const [prefillData, setPrefillData] = useState<any>(null);
+  const [lastPatientInput, setLastPatientInput] = useState<any>(null);
 
-  const handleResult = (data: any) => setResult(data);
-  const handleExportPDF = () => alert("PDF Export coming soon!");
+  const handleResult = (data: any, patientInput?: any) => {
+    setResult(data);
+    if (patientInput) setLastPatientInput(patientInput);
+  };
+
+  const handleFeaturesExtracted = (features: Record<string, string | number>) => {
+    // Trigger prefill in PredictionForm via key-change or state update
+    setPrefillData({ ...features, _timestamp: Date.now() });
+    // Scroll to form
+    setTimeout(() => {
+      const formEl = document.getElementById("prediction-form-section");
+      if (formEl) formEl.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 100);
+  };
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
@@ -31,7 +45,7 @@ export default function PredictPage() {
             New Prediction
           </h1>
           <p style={{ color: "#4B5563", marginTop: "0.5rem", fontSize: "1rem" }}>
-            Enter patient clinical data for AI-powered recurrence analysis.
+            Enter patient clinical data or paste notes for AI-powered analysis.
           </p>
         </div>
         <div style={{
@@ -61,18 +75,22 @@ export default function PredictPage() {
         </div>
       </motion.div>
 
+      {/* AI Note Parser at the top */}
+      <NoteParser onFeaturesExtracted={handleFeaturesExtracted} />
+
+      {/* Grid: Form on left, Result on right */}
       <div style={{
         display: "grid",
         gridTemplateColumns: "1fr",
         gap: "1.5rem",
       }} className="predict-grid">
-        <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
+        <div id="prediction-form-section" style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
           <PredictionForm onResult={handleResult} prefillData={prefillData} />
         </div>
 
         <div>
           {result ? (
-            <ResultCard result={result} onExportPDF={handleExportPDF} />
+            <ResultCard result={result} patientInput={lastPatientInput} />
           ) : (
             <motion.div
               initial={{ opacity: 0 }}
@@ -93,13 +111,8 @@ export default function PredictPage() {
               }}
             >
               <motion.div
-                animate={{
-                  scale: [1, 1.1, 1],
-                }}
-                transition={{
-                  duration: 2,
-                  repeat: Infinity,
-                }}
+                animate={{ scale: [1, 1.1, 1] }}
+                transition={{ duration: 2, repeat: Infinity }}
                 style={{
                   width: "80px",
                   height: "80px",
@@ -129,7 +142,7 @@ export default function PredictPage() {
                   maxWidth: "380px",
                   lineHeight: "1.6",
                 }}>
-                  Fill in the patient data on the left and click <strong>Run AI Prediction</strong> to get instant recurrence analysis with SHAP explanations.
+                  Paste clinical notes above OR fill the form manually, then click <strong>Run AI Prediction</strong>.
                 </p>
               </div>
               <div style={{

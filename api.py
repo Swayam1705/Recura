@@ -7,6 +7,17 @@ import pandas as pd
 import os
 import io
 import math
+import re
+from database import (
+    save_prediction, get_all_predictions, get_patient_timeline,
+    get_stats, delete_prediction, export_all_csv
+)
+from notifications import (
+    check_and_create_alert, get_alerts, get_alert_counts,
+    acknowledge_alert, acknowledge_all, delete_alert,
+    load_config, save_config, send_email_alert
+)
+from fastapi.responses import Response
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 TRAINING_CSV = os.path.join(BASE_DIR, "Thyroid_Diff.csv")
@@ -72,6 +83,7 @@ class PatientData(BaseModel):
     N: str
     Risk: str
     Pathology: str
+    patient_id: str | None = None  # Optional: for follow-up predictions
 
 def clean_value(v):
     if v is None:
@@ -195,6 +207,7 @@ def generate_shap_values(patient: PatientData, prob):
         "Response": 0.28, "Risk": 0.24, "T": 0.18, "N": 0.14,
         "Physical Examination": 0.08, "Age": 0.05, "Pathology": 0.03,
     }
+    
 
     risk_severity = {
         "Response": {"Excellent": 0.1, "Indeterminate": 0.4, "Biochemical Incomplete": 0.7, "Structural Incomplete": 1.0},
@@ -224,6 +237,31 @@ def generate_shap_values(patient: PatientData, prob):
         })
     return sorted(shap, key=lambda x: x["impact"], reverse=True)
 
+def generate_patient_id() -> str:
+    """Generate next sequential patient ID like PT-000001, PT-000002, etc."""
+    try:
+        from database import get_conn
+        with get_conn() as conn:
+            row = conn.execute(
+                "SELECT patient_id FROM predictions ORDER BY id DESC LIMIT 1"
+            ).fetchone()
+
+            if row and row["patient_id"]:
+                # Extract number from PT-XXXXXX format
+                last_id = row["patient_id"]
+                match = re.search(r'PT-(\d+)', last_id)
+                if match:
+                    next_num = int(match.group(1)) + 1
+                    return f"PT-{next_num:06d}"
+
+        # Default: start at PT-000001
+        return "PT-000001"
+    except Exception as e:
+        # Fallback if DB fails
+        print(f"ID generation failed: {e}, using timestamp fallback")
+        import time
+        return f"PT-{int(time.time()) % 1000000:06d}"
+
 @app.get("/")
 def root():
     return {
@@ -233,6 +271,40 @@ def root():
         "features": ALL_FEATURES,
         "top_features": TOP_FEATURES,
     }
+
+# @app.post("/predict")
+# def predict_recurrence(patient: PatientData):
+#     if MODEL_LOADED and cnn_model is not None and scaler is not None:
+#         try:
+#             full_row = build_full_feature_row(patient)
+#             processed = preprocess_for_cnn(full_row)
+#             raw_prob = float(cnn_model.predict(processed, verbose=0)[0][0])
+
+#             clinical_severity = calculate_clinical_severity(patient)
+#             final_prob, risk_level = get_calibrated_prediction(raw_prob, clinical_severity)
+
+#             print(f"CNN: {raw_prob:.3f} | Clinical: {clinical_severity:.3f} | Blended: {final_prob:.3f} | Risk: {risk_level}")
+
+#         except Exception as e:
+#             print(f"Prediction error: {e}")
+#             final_prob = 0.5
+#             risk_level = "medium"
+#     else:
+#         final_prob = 0.5
+#         risk_level = "medium"
+
+#     final = 1 if final_prob > 0.5 else 0
+#     return {
+#         "patientId": f"PT-{np.random.randint(1000, 9999)}",
+#         "prediction": final,
+#         "recurrenceProbability": final_prob,
+#         "confidence": max(final_prob, 1 - final_prob),
+#         "riskLevel": risk_level,
+#         "status": "High Risk of Recurrence" if final == 1 else "Low Risk of Recurrence",
+#         "shapValues": generate_shap_values(patient, final_prob),
+#         "modelVersion": "Deep 1D-CNN + Clinical Calibration v4.1",
+#         "timestamp": pd.Timestamp.now().isoformat(),
+#     }
 
 @app.post("/predict")
 def predict_recurrence(patient: PatientData):
@@ -255,9 +327,17 @@ def predict_recurrence(patient: PatientData):
         final_prob = 0.5
         risk_level = "medium"
 
+    # Determine patient ID: use provided one OR generate new sequential ID
+    if patient.patient_id and patient.patient_id.strip():
+        patient_id = patient.patient_id.strip().upper()
+        print(f"Using existing patient ID: {patient_id}")
+    else:
+        patient_id = generate_patient_id()
+        print(f"Generated new patient ID: {patient_id}")
+
     final = 1 if final_prob > 0.5 else 0
-    return {
-        "patientId": f"PT-{np.random.randint(1000, 9999)}",
+    response_data = {
+        "patientId": patient_id,
         "prediction": final,
         "recurrenceProbability": final_prob,
         "confidence": max(final_prob, 1 - final_prob),
@@ -267,6 +347,21 @@ def predict_recurrence(patient: PatientData):
         "modelVersion": "Deep 1D-CNN + Clinical Calibration v4.1",
         "timestamp": pd.Timestamp.now().isoformat(),
     }
+    # Auto-trigger alert if risk warrants it
+    try:
+        alert = check_and_create_alert(
+            patient_id=patient_id,
+            risk_level=risk_level,
+            risk_score=final_prob,
+            pathology=patient.Pathology,
+        )
+        if alert:
+            response_data["alertCreated"] = True
+            response_data["alertId"] = alert["id"]
+    except Exception as e:
+        print(f"Alert creation failed: {e}")
+
+    return response_data
 
 @app.post("/predict/batch")
 async def predict_batch(file: UploadFile = File(...)):
@@ -348,3 +443,470 @@ def get_metrics():
     except Exception as e:
         print(f"Error reading metrics: {e}")
         return {}
+
+# ═══════════════════════════════════════════════════════════════════
+#  AI NOTE PARSER - Extract structured data from clinical notes
+# ═══════════════════════════════════════════════════════════════════
+
+import re
+import json as json_lib
+
+class NoteParseRequest(BaseModel):
+    notes: str
+    use_llm: bool = True
+
+# ── REGEX FALLBACK EXTRACTOR (works without OpenAI) ────────────────
+def regex_extract_features(notes: str) -> dict:
+    """Rule-based extraction — always works, no API needed"""
+    text = notes.lower()
+    features = {}
+    confidence = {}
+    source_texts = {}
+
+    # AGE
+    age_match = re.search(r'(\d{1,3})\s*(?:y[/\s]?o|year|yr|yrs)', text)
+    if age_match:
+        age = int(age_match.group(1))
+        if 1 <= age <= 120:
+            features['Age'] = age
+            confidence['Age'] = 0.92
+            source_texts['Age'] = age_match.group(0)
+
+    # T STAGE
+    t_match = re.search(r'\bt\s*([1-4][ab]?)\b', text)
+    if t_match:
+        t_val = f"T{t_match.group(1).upper()}"
+        valid_t = ["T1a", "T1b", "T2", "T3a", "T3b", "T4a", "T4b"]
+        if t_val in valid_t:
+            features['T'] = t_val
+            confidence['T'] = 0.90
+            source_texts['T'] = t_match.group(0)
+
+    # N STAGE
+    n_match = re.search(r'\bn\s*([01][ab]?)\b', text)
+    if n_match:
+        n_val = f"N{n_match.group(1).lower()}"
+        valid_n = ["N0", "N1a", "N1b"]
+        if n_val in valid_n:
+            features['N'] = n_val
+            confidence['N'] = 0.90
+            source_texts['N'] = n_match.group(0)
+
+    # ATA RISK
+    risk_patterns = [
+        (r'\b(high)\s*risk\b', 'High'),
+        (r'\b(intermediate|medium|moderate)\s*risk\b', 'Intermediate'),
+        (r'\b(low)\s*risk\b', 'Low'),
+        (r'\bata\s*(high|intermediate|low)\b', None),
+    ]
+    for pattern, direct in risk_patterns:
+        m = re.search(pattern, text)
+        if m:
+            val = direct if direct else m.group(1).capitalize()
+            if val.lower() == 'intermediate' or val.lower() in ['medium', 'moderate']:
+                features['Risk'] = 'Intermediate'
+            elif val.lower() == 'high':
+                features['Risk'] = 'High'
+            elif val.lower() == 'low':
+                features['Risk'] = 'Low'
+            confidence['Risk'] = 0.88
+            source_texts['Risk'] = m.group(0)
+            break
+
+    # TREATMENT RESPONSE
+    response_map = {
+        r'\bexcellent\s*response\b': 'Excellent',
+        r'\bstructural\s*incomplete\b': 'Structural Incomplete',
+        r'\bstructurally\s*incomplete\b': 'Structural Incomplete',
+        r'\bbiochemical\s*incomplete\b': 'Biochemical Incomplete',
+        r'\bbiochemically\s*incomplete\b': 'Biochemical Incomplete',
+        r'\bindeterminate\s*response\b': 'Indeterminate',
+        r'\bindeterminate\b': 'Indeterminate',
+    }
+    for pattern, val in response_map.items():
+        m = re.search(pattern, text)
+        if m:
+            features['Response'] = val
+            confidence['Response'] = 0.87
+            source_texts['Response'] = m.group(0)
+            break
+
+    # PATHOLOGY
+    path_map = {
+        r'\bmicropapillary\b': 'Micropapillary',
+        r'\bpapillary\b': 'Papillary',
+        r'\bfollicular\b': 'Follicular',
+        r'\bh[uü]rth[le]+\s*cell\b': 'Hurthel cell',
+    }
+    for pattern, val in path_map.items():
+        m = re.search(pattern, text)
+        if m:
+            features['Pathology'] = val
+            confidence['Pathology'] = 0.89
+            source_texts['Pathology'] = m.group(0)
+            break
+
+    # PHYSICAL EXAMINATION
+    exam_map = {
+        r'\bmultinodular\s*goiter\b': 'Multinodular goiter',
+        r'\bdiffuse\s*goiter\b': 'Diffuse goiter',
+        r'\bsingle\s*nodul[ae]r?\s*goiter[- ]*left\b': 'Single nodular goiter-left',
+        r'\bsingle\s*nodul[ae]r?\s*goiter[- ]*right\b': 'Single nodular goiter-right',
+        r'\bleft\s*(?:thyroid\s*)?nodul[ae]\b': 'Single nodular goiter-left',
+        r'\bright\s*(?:thyroid\s*)?nodul[ae]\b': 'Single nodular goiter-right',
+        r'\bnormal\s*(?:physical\s*)?exam(?:ination)?\b': 'Normal',
+        r'\bunremarkable\s*exam(?:ination)?\b': 'Normal',
+    }
+    for pattern, val in exam_map.items():
+        m = re.search(pattern, text)
+        if m:
+            features['Physical_Examination'] = val
+            confidence['Physical_Examination'] = 0.82
+            source_texts['Physical_Examination'] = m.group(0)
+            break
+
+    return {
+        'features': features,
+        'confidence': confidence,
+        'source_texts': source_texts,
+    }
+
+
+# ── OPENAI EXTRACTOR (better accuracy, requires API key) ───────────
+async def openai_extract_features(notes: str) -> dict:
+    """LLM-based extraction using OpenAI GPT"""
+    import os
+    api_key = os.getenv('OPENAI_API_KEY')
+    if not api_key:
+        raise ValueError("OPENAI_API_KEY not set")
+
+    try:
+        from openai import OpenAI
+        client = OpenAI(api_key=api_key)
+    except ImportError:
+        raise ImportError("openai package not installed")
+
+    system_prompt = """You are a medical NLP extractor for thyroid cancer records.
+Extract fields from clinical notes. Return ONLY valid JSON, no markdown.
+
+Required JSON structure:
+{
+  "features": {
+    "Age": <number 1-120 or null>,
+    "T": <"T1a"|"T1b"|"T2"|"T3a"|"T3b"|"T4a"|"T4b" or null>,
+    "N": <"N0"|"N1a"|"N1b" or null>,
+    "Risk": <"Low"|"Intermediate"|"High" or null>,
+    "Response": <"Excellent"|"Indeterminate"|"Biochemical Incomplete"|"Structural Incomplete" or null>,
+    "Pathology": <"Papillary"|"Follicular"|"Micropapillary"|"Hurthel cell" or null>,
+    "Physical_Examination": <"Normal"|"Single nodular goiter-left"|"Single nodular goiter-right"|"Multinodular goiter"|"Diffuse goiter" or null>
+  },
+  "confidence": {
+    "<field_name>": <0.0-1.0 confidence score>
+  },
+  "source_texts": {
+    "<field_name>": "<exact phrase from notes>"
+  }
+}
+
+Only include fields you're confident about. Use null for missing data."""
+
+    response = client.chat.completions.create(
+        model="gpt-3.5-turbo",
+        messages=[
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": f"Extract from these notes:\n\n{notes}"}
+        ],
+        temperature=0.1,
+        max_tokens=600,
+    )
+
+    raw = response.choices[0].message.content.strip()
+    # Strip markdown code fences if present
+    raw = re.sub(r'^```(?:json)?\s*|\s*```$', '', raw, flags=re.MULTILINE).strip()
+    data = json_lib.loads(raw)
+
+    # Filter out null values
+    features = {k: v for k, v in data.get('features', {}).items() if v is not None}
+    confidence = data.get('confidence', {})
+    source_texts = data.get('source_texts', {})
+
+    return {
+        'features': features,
+        'confidence': confidence,
+        'source_texts': source_texts,
+    }
+
+
+# ── MAIN ENDPOINT ──────────────────────────────────────────────────
+@app.post("/parse-notes")
+async def parse_clinical_notes(request: NoteParseRequest):
+    notes = request.notes.strip()
+    if not notes:
+        raise HTTPException(status_code=400, detail="Notes cannot be empty")
+    if len(notes) < 15:
+        raise HTTPException(status_code=400, detail="Notes too short to extract meaningful features")
+
+    model_used = "regex-fallback"
+    result = None
+
+    # Try OpenAI first if requested
+    if request.use_llm:
+        try:
+            result = await openai_extract_features(notes)
+            model_used = "gpt-3.5-turbo"
+            print(f"OpenAI extracted {len(result['features'])} features")
+        except Exception as e:
+            print(f"OpenAI failed ({e}), falling back to regex")
+            result = regex_extract_features(notes)
+    else:
+        result = regex_extract_features(notes)
+
+    return {
+        "extracted_features": result['features'],
+        "confidence_scores": result['confidence'],
+        "source_texts": result['source_texts'],
+        "model_used": model_used,
+        "field_count": len(result['features']),
+    }
+
+
+@app.get("/parse-notes/health")
+def note_parser_health():
+    import os
+    return {
+        "openai_available": bool(os.getenv('OPENAI_API_KEY')),
+        "regex_fallback": True,
+        "status": "ok"
+    }
+
+# ═══════════════════════════════════════════════════════════════════
+#  PATIENT HISTORY ENDPOINTS
+# ═══════════════════════════════════════════════════════════════════
+
+@app.get("/history")
+def get_history(
+    search: str = "",
+    risk: str = "",
+    page: int = 1,
+    per_page: int = 20
+):
+    """Get paginated prediction history with optional search + risk filter"""
+    try:
+        return get_all_predictions(search, risk, page, per_page)
+    except Exception as e:
+        print(f"History error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/history/stats")
+def history_stats():
+    """Dashboard aggregate statistics"""
+    try:
+        return get_stats()
+    except Exception as e:
+        print(f"Stats error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/history/patient/{patient_id}")
+def patient_timeline(patient_id: str):
+    """Get all predictions for a specific patient"""
+    try:
+        timeline = get_patient_timeline(patient_id)
+        if not timeline:
+            raise HTTPException(status_code=404, detail=f"No history found for patient {patient_id}")
+        return {
+            "patient_id": patient_id,
+            "prediction_count": len(timeline),
+            "predictions": timeline,
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Timeline error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.delete("/history/{prediction_id}")
+def delete_prediction_endpoint(prediction_id: int):
+    """Delete a specific prediction record"""
+    try:
+        success = delete_prediction(prediction_id)
+        if not success:
+            raise HTTPException(status_code=404, detail="Prediction not found")
+        return {"deleted": True, "id": prediction_id}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/history/export/csv")
+def export_history_csv():
+    """Download all predictions as CSV"""
+    try:
+        csv_data = export_all_csv()
+        return Response(
+            content=csv_data,
+            media_type="text/csv",
+            headers={
+                "Content-Disposition": f"attachment; filename=recura_history_{pd.Timestamp.now().strftime('%Y%m%d_%H%M%S')}.csv"
+            }
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/history/patients/search")
+def search_patients(q: str = ""):
+    """Search for existing patient IDs (for autocomplete in prediction form)"""
+    try:
+        from database import get_conn
+        with get_conn() as conn:
+            query = q.strip().upper()
+            if query:
+                rows = conn.execute("""
+                SELECT DISTINCT patient_id,
+                       COUNT(*) as prediction_count,
+                       MAX(created_at) as last_visit,
+                       (SELECT risk_level FROM predictions p2 
+                        WHERE p2.patient_id = p1.patient_id 
+                        ORDER BY created_at DESC LIMIT 1) as last_risk,
+                       (SELECT pathology FROM predictions p2 
+                        WHERE p2.patient_id = p1.patient_id 
+                        ORDER BY created_at DESC LIMIT 1) as pathology,
+                       (SELECT age FROM predictions p2 
+                        WHERE p2.patient_id = p1.patient_id 
+                        ORDER BY created_at DESC LIMIT 1) as age
+                FROM predictions p1
+                WHERE patient_id LIKE ?
+                GROUP BY patient_id
+                ORDER BY last_visit DESC
+                LIMIT 10
+                """, (f"%{query}%",)).fetchall()
+            else:
+                # Return recent patients if no query
+                rows = conn.execute("""
+                SELECT DISTINCT patient_id,
+                       COUNT(*) as prediction_count,
+                       MAX(created_at) as last_visit,
+                       (SELECT risk_level FROM predictions p2 
+                        WHERE p2.patient_id = p1.patient_id 
+                        ORDER BY created_at DESC LIMIT 1) as last_risk,
+                       (SELECT pathology FROM predictions p2 
+                        WHERE p2.patient_id = p1.patient_id 
+                        ORDER BY created_at DESC LIMIT 1) as pathology,
+                       (SELECT age FROM predictions p2 
+                        WHERE p2.patient_id = p1.patient_id 
+                        ORDER BY created_at DESC LIMIT 1) as age
+                FROM predictions p1
+                GROUP BY patient_id
+                ORDER BY last_visit DESC
+                LIMIT 10
+                """).fetchall()
+
+            return [dict(row) for row in rows]
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+    # ═══════════════════════════════════════════════════════════════════
+#  NOTIFICATIONS & ALERTS ENDPOINTS
+# ═══════════════════════════════════════════════════════════════════
+
+class AlertConfig(BaseModel):
+    high_risk_threshold: float = 0.65
+    medium_risk_threshold: float = 0.40
+    in_app_enabled: bool = True
+    email_enabled: bool = False
+    email_recipients: list = []
+    notify_on_high: bool = True
+    notify_on_medium: bool = True
+    notify_on_low: bool = False
+
+
+@app.get("/alerts")
+def list_alerts(unread_only: bool = False, limit: int = 50):
+    """Get all alerts, most recent first"""
+    try:
+        return get_alerts(unread_only=unread_only, limit=limit)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/alerts/counts")
+def alert_counts():
+    """Get aggregated alert counts (for badge display)"""
+    try:
+        return get_alert_counts()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/alerts/{alert_id}/acknowledge")
+def ack_alert(alert_id: int):
+    """Mark a specific alert as acknowledged"""
+    try:
+        success = acknowledge_alert(alert_id)
+        if not success:
+            raise HTTPException(status_code=404, detail="Alert not found or already acknowledged")
+        return {"acknowledged": True, "id": alert_id}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/alerts/acknowledge-all")
+def ack_all_alerts():
+    """Mark all unread alerts as acknowledged"""
+    try:
+        count = acknowledge_all()
+        return {"acknowledged_count": count}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.delete("/alerts/{alert_id}")
+def remove_alert(alert_id: int):
+    """Delete an alert"""
+    try:
+        success = delete_alert(alert_id)
+        if not success:
+            raise HTTPException(status_code=404, detail="Alert not found")
+        return {"deleted": True, "id": alert_id}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/alerts/config")
+def get_alert_config():
+    """Get current alert configuration"""
+    return load_config()
+
+
+@app.put("/alerts/config")
+def update_alert_config(config: AlertConfig):
+    """Update alert configuration"""
+    try:
+        save_config(config.dict())
+        return {"updated": True, "config": config.dict()}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/alerts/test")
+def send_test_alert():
+    """Create a test alert for demo purposes"""
+    try:
+        alert = check_and_create_alert(
+            patient_id="PT-TEST",
+            risk_level="high",
+            risk_score=0.85,
+            pathology="Test Pathology",
+        )
+        if alert:
+            return {"created": True, "alert": alert}
+        return {"created": False, "message": "Alert threshold not met by config"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
