@@ -1,18 +1,19 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
   Brain,
   Upload,
-  FileText,
   Settings,
   ChevronLeft,
   LogOut,
   Bell,
   HelpCircle,
   BarChart3,
+  History,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -21,13 +22,7 @@ const navItems = [
   { href: "/dashboard/predict", icon: Brain, label: "New Prediction" },
   { href: "/dashboard/batch", icon: Upload, label: "Batch Upload" },
   { href: "/dashboard/analytics", icon: BarChart3, label: "Model Analytics" },
-  { href: "/dashboard/reports", icon: FileText, label: "Reports" },
-];
-
-const bottomItems = [
-  { href: "/dashboard/notifications", icon: Bell, label: "Notifications", badge: 3 },
-  { href: "/dashboard/help", icon: HelpCircle, label: "Help & Support" },
-  { href: "/dashboard/settings", icon: Settings, label: "Settings" },
+  { href: "/dashboard/history", icon: History, label: "Patient History" },
 ];
 
 interface SidebarProps {
@@ -38,6 +33,29 @@ interface SidebarProps {
 export default function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
   const pathname = usePathname();
   const width = isOpen ? 280 : 88;
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  // Poll unread notifications every 15s
+  useEffect(() => {
+    const fetchCount = async () => {
+      try {
+        const res = await fetch("http://127.0.0.1:8000/alerts/counts");
+        const data = await res.json();
+        setUnreadCount(data.unread || 0);
+      } catch (err) {
+        // Silent fail - don't break sidebar if backend down
+      }
+    };
+    fetchCount();
+    const interval = setInterval(fetchCount, 15000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const bottomItems = [
+    { href: "/dashboard/notifications", icon: Bell, label: "Notifications", badge: unreadCount },
+    { href: "/dashboard/help", icon: HelpCircle, label: "Help & Support" },
+    { href: "/dashboard/settings", icon: Settings, label: "Settings" },
+  ];
 
   return (
     <motion.aside
@@ -76,13 +94,9 @@ export default function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
               style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}
             >
               <div style={{
-                width: "40px",
-                height: "40px",
-                borderRadius: "12px",
+                width: "40px", height: "40px", borderRadius: "12px",
                 background: "linear-gradient(135deg, #3B82F6, #1D4ED8)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
+                display: "flex", alignItems: "center", justifyContent: "center",
                 boxShadow: "0 4px 12px rgba(59, 130, 246, 0.4)",
                 flexShrink: 0,
               }}>
@@ -92,22 +106,16 @@ export default function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
               </div>
               <div>
                 <div style={{
-                  fontFamily: "var(--font-space)",
-                  fontWeight: "700",
-                  color: "#111827",
-                  fontSize: "1.25rem",
-                  lineHeight: "1",
-                  letterSpacing: "-0.02em",
+                  fontFamily: "var(--font-space)", fontWeight: "700",
+                  color: "#111827", fontSize: "1.25rem",
+                  lineHeight: "1", letterSpacing: "-0.02em",
                 }}>
                   Recura
                 </div>
                 <div style={{
-                  color: "#2563EB",
-                  fontSize: "9px",
-                  fontWeight: "700",
-                  letterSpacing: "0.2em",
-                  textTransform: "uppercase",
-                  marginTop: "4px",
+                  color: "#2563EB", fontSize: "9px",
+                  fontWeight: "700", letterSpacing: "0.2em",
+                  textTransform: "uppercase", marginTop: "4px",
                 }}>
                   Clinical AI
                 </div>
@@ -120,13 +128,9 @@ export default function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               style={{
-                width: "40px",
-                height: "40px",
-                borderRadius: "12px",
+                width: "40px", height: "40px", borderRadius: "12px",
                 background: "linear-gradient(135deg, #3B82F6, #1D4ED8)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
+                display: "flex", alignItems: "center", justifyContent: "center",
                 boxShadow: "0 4px 12px rgba(59, 130, 246, 0.4)",
                 margin: "0 auto",
               }}
@@ -142,15 +146,10 @@ export default function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
           <button
             onClick={() => setIsOpen(false)}
             style={{
-              padding: "8px",
-              borderRadius: "8px",
-              background: "transparent",
-              border: "none",
-              cursor: "pointer",
-              color: "#6B7280",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
+              padding: "8px", borderRadius: "8px",
+              background: "transparent", border: "none",
+              cursor: "pointer", color: "#6B7280",
+              display: "flex", alignItems: "center", justifyContent: "center",
             }}
             onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = "#F3F4F6"; }}
             onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "transparent"; }}
@@ -163,27 +162,17 @@ export default function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
       <div style={{ padding: "1rem", borderBottom: "1px solid #F3F4F6", flexShrink: 0 }}>
         {isOpen ? (
           <div style={{
-            display: "flex",
-            alignItems: "center",
-            gap: "0.75rem",
-            padding: "0.75rem",
-            borderRadius: "12px",
+            display: "flex", alignItems: "center", gap: "0.75rem",
+            padding: "0.75rem", borderRadius: "12px",
             background: "linear-gradient(135deg, #EFF6FF, #F0F9FF)",
             border: "1px solid #DBEAFE",
           }}>
             <div style={{
-              width: "44px",
-              height: "44px",
-              borderRadius: "50%",
+              width: "44px", height: "44px", borderRadius: "50%",
               background: "linear-gradient(135deg, #3B82F6, #2563EB)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              color: "white",
-              fontSize: "0.875rem",
-              fontWeight: "700",
-              flexShrink: 0,
-              boxShadow: "0 4px 12px rgba(59, 130, 246, 0.4)",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              color: "white", fontSize: "0.875rem", fontWeight: "700",
+              flexShrink: 0, boxShadow: "0 4px 12px rgba(59, 130, 246, 0.4)",
             }}>
               DS
             </div>
@@ -199,30 +188,18 @@ export default function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
           </div>
         ) : (
           <div style={{
-            width: "44px",
-            height: "44px",
-            borderRadius: "50%",
+            width: "44px", height: "44px", borderRadius: "50%",
             background: "linear-gradient(135deg, #3B82F6, #2563EB)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            color: "white",
-            fontSize: "0.875rem",
-            fontWeight: "700",
-            margin: "0 auto",
-            position: "relative",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            color: "white", fontSize: "0.875rem", fontWeight: "700",
+            margin: "0 auto", position: "relative",
             boxShadow: "0 4px 12px rgba(59, 130, 246, 0.4)",
           }}>
             DS
             <div style={{
-              position: "absolute",
-              bottom: "-2px",
-              right: "-2px",
-              width: "14px",
-              height: "14px",
-              borderRadius: "50%",
-              backgroundColor: "#10B981",
-              border: "2px solid white",
+              position: "absolute", bottom: "-2px", right: "-2px",
+              width: "14px", height: "14px", borderRadius: "50%",
+              backgroundColor: "#10B981", border: "2px solid white",
             }} />
           </div>
         )}
@@ -231,12 +208,9 @@ export default function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
       <nav style={{ flex: 1, padding: "0.75rem", overflow: "auto" }}>
         {isOpen && (
           <div style={{
-            fontSize: "10px",
-            fontWeight: "700",
-            color: "#9CA3AF",
-            textTransform: "uppercase",
-            letterSpacing: "0.15em",
-            padding: "0.75rem 0.75rem 0.5rem",
+            fontSize: "10px", fontWeight: "700",
+            color: "#9CA3AF", textTransform: "uppercase",
+            letterSpacing: "0.15em", padding: "0.75rem 0.75rem 0.5rem",
           }}>
             Main Menu
           </div>
@@ -248,14 +222,9 @@ export default function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
               key={href}
               href={href}
               style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "0.75rem",
-                padding: "0.75rem",
-                borderRadius: "12px",
-                marginBottom: "4px",
-                textDecoration: "none",
-                position: "relative",
+                display: "flex", alignItems: "center", gap: "0.75rem",
+                padding: "0.75rem", borderRadius: "12px", marginBottom: "4px",
+                textDecoration: "none", position: "relative",
                 backgroundColor: isActive ? "#EFF6FF" : "transparent",
                 color: isActive ? "#1D4ED8" : "#4B5563",
                 fontWeight: isActive ? "600" : "500",
@@ -277,12 +246,8 @@ export default function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
             >
               {isActive && (
                 <div style={{
-                  position: "absolute",
-                  left: 0,
-                  top: "50%",
-                  transform: "translateY(-50%)",
-                  width: "4px",
-                  height: "32px",
+                  position: "absolute", left: 0, top: "50%",
+                  transform: "translateY(-50%)", width: "4px", height: "32px",
                   background: "linear-gradient(to bottom, #3B82F6, #2563EB)",
                   borderRadius: "0 4px 4px 0",
                 }} />
@@ -297,34 +262,29 @@ export default function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
 
         {isOpen && (
           <div style={{
-            fontSize: "10px",
-            fontWeight: "700",
-            color: "#9CA3AF",
-            textTransform: "uppercase",
-            letterSpacing: "0.15em",
-            padding: "1.5rem 0.75rem 0.5rem",
+            fontSize: "10px", fontWeight: "700",
+            color: "#9CA3AF", textTransform: "uppercase",
+            letterSpacing: "0.15em", padding: "1.5rem 0.75rem 0.5rem",
           }}>
             Account
           </div>
         )}
         {bottomItems.map(({ href, icon: Icon, label, badge }) => {
           const isActive = pathname === href;
+          const hasBadge = badge !== undefined && badge > 0;
           return (
             <Link
               key={href}
               href={href}
               style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "0.75rem",
-                padding: "0.75rem",
-                borderRadius: "12px",
-                marginBottom: "4px",
+                display: "flex", alignItems: "center", gap: "0.75rem",
+                padding: "0.75rem", borderRadius: "12px", marginBottom: "4px",
                 textDecoration: "none",
                 backgroundColor: isActive ? "#EFF6FF" : "transparent",
                 color: isActive ? "#1D4ED8" : "#4B5563",
                 fontWeight: isActive ? "600" : "500",
                 justifyContent: isOpen ? "flex-start" : "center",
+                position: "relative",
               }}
               onMouseEnter={(e) => {
                 if (!isActive) e.currentTarget.style.backgroundColor = "#F9FAFB";
@@ -333,11 +293,33 @@ export default function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
                 if (!isActive) e.currentTarget.style.backgroundColor = "transparent";
               }}
             >
-              <Icon size={20} strokeWidth={2} style={{ flexShrink: 0 }} />
+              <div style={{ position: "relative", flexShrink: 0 }}>
+                <Icon size={20} strokeWidth={2} />
+                {!isOpen && hasBadge && (
+                  <span style={{
+                    position: "absolute",
+                    top: -6, right: -6,
+                    minWidth: 16, height: 16,
+                    padding: "0 4px",
+                    backgroundColor: "#EF4444",
+                    color: "white",
+                    fontSize: "9px",
+                    fontWeight: "700",
+                    borderRadius: "9999px",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    border: "2px solid white",
+                    animation: hasBadge ? "pulse 2s infinite" : "none",
+                  }}>
+                    {badge > 99 ? "99+" : badge}
+                  </span>
+                )}
+              </div>
               {isOpen && (
                 <>
                   <span style={{ fontSize: "0.875rem", flex: 1 }}>{label}</span>
-                  {badge && (
+                  {hasBadge && (
                     <span style={{
                       backgroundColor: "#EF4444",
                       color: "white",
@@ -345,8 +327,9 @@ export default function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
                       fontWeight: "700",
                       padding: "2px 8px",
                       borderRadius: "9999px",
+                      animation: "pulse 2s infinite",
                     }}>
-                      {badge}
+                      {badge > 99 ? "99+" : badge}
                     </span>
                   )}
                 </>
@@ -361,15 +344,9 @@ export default function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
           <button
             onClick={() => setIsOpen(true)}
             style={{
-              width: "100%",
-              padding: "8px",
-              borderRadius: "8px",
-              background: "transparent",
-              border: "none",
-              cursor: "pointer",
-              color: "#6B7280",
-              display: "flex",
-              justifyContent: "center",
+              width: "100%", padding: "8px", borderRadius: "8px",
+              background: "transparent", border: "none", cursor: "pointer",
+              color: "#6B7280", display: "flex", justifyContent: "center",
               marginBottom: "8px",
             }}
             onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = "#F3F4F6"; }}
@@ -379,18 +356,11 @@ export default function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
           </button>
         )}
         <button style={{
-          width: "100%",
-          display: "flex",
-          alignItems: "center",
-          gap: "0.75rem",
-          padding: "0.75rem",
-          borderRadius: "12px",
-          color: "#DC2626",
-          background: "transparent",
-          border: "none",
-          cursor: "pointer",
-          fontSize: "0.875rem",
-          fontWeight: "600",
+          width: "100%", display: "flex", alignItems: "center", gap: "0.75rem",
+          padding: "0.75rem", borderRadius: "12px",
+          color: "#DC2626", background: "transparent",
+          border: "none", cursor: "pointer",
+          fontSize: "0.875rem", fontWeight: "600",
           justifyContent: isOpen ? "flex-start" : "center",
         }}
         onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = "#FEF2F2"; }}
@@ -400,6 +370,13 @@ export default function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
           {isOpen && "Sign Out"}
         </button>
       </div>
+
+      <style jsx>{`
+        @keyframes pulse {
+          0%, 100% { opacity: 1; transform: scale(1); }
+          50% { opacity: 0.7; transform: scale(1.1); }
+        }
+      `}</style>
     </motion.aside>
   );
 }
