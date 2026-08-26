@@ -40,6 +40,21 @@ const RISK_STYLES: Record<string, { bg: string; text: string; border: string; do
   high: { bg: "#FEE2E2", text: "#991B1B", border: "#FECACA", dot: "#EF4444" },
 };
 
+// Helper: get logged-in doctor's ID
+function getDoctorId(): string {
+  if (typeof window === "undefined") return "";
+  try {
+    const stored = localStorage.getItem("recura_user");
+    if (stored) {
+      const user = JSON.parse(stored);
+      if (user?.id) return String(user.id);
+    }
+  } catch (e) {
+    console.error(e);
+  }
+  return "";
+}
+
 export default function HistoryPage() {
   const [predictions, setPredictions] = useState<Prediction[]>([]);
   const [stats, setStats] = useState<Stats | null>(null);
@@ -54,9 +69,11 @@ export default function HistoryPage() {
   const fetchPredictions = useCallback(async () => {
     setLoading(true);
     try {
+      const docId = getDoctorId();
       const params = new URLSearchParams({
         page: String(page),
         per_page: "20",
+        ...(docId && { doctor_id: docId }),
         ...(search && { search }),
         ...(riskFilter && { risk: riskFilter }),
       });
@@ -75,7 +92,9 @@ export default function HistoryPage() {
   const fetchStats = useCallback(async () => {
     setStatsLoading(true);
     try {
-      const res = await fetch("http://127.0.0.1:8000/history/stats");
+      const docId = getDoctorId();
+      const query = docId ? `?doctor_id=${docId}` : "";
+      const res = await fetch(`http://127.0.0.1:8000/history/stats${query}`);
       const data = await res.json();
       setStats(data);
     } catch (err) {
@@ -95,7 +114,9 @@ export default function HistoryPage() {
   }, [fetchStats]);
 
   const handleExportCSV = () => {
-    window.open("http://127.0.0.1:8000/history/export/csv", "_blank");
+    const docId = getDoctorId();
+    const query = docId ? `?doctor_id=${docId}` : "";
+    window.open(`http://127.0.0.1:8000/history/export/csv${query}`, "_blank");
   };
 
   const statCards = stats ? [
@@ -109,7 +130,6 @@ export default function HistoryPage() {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
-      {/* Header */}
       <motion.div
         initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}
@@ -126,7 +146,7 @@ export default function HistoryPage() {
             Patient History
           </h1>
           <p style={{ color: "#4B5563", marginTop: "0.5rem", fontSize: "1rem" }}>
-            All predictions saved automatically. Search, filter, and track patient outcomes.
+            All your predictions saved automatically in your isolated workspace.
           </p>
         </div>
         <button
@@ -147,11 +167,10 @@ export default function HistoryPage() {
           }}
         >
           <Download size={16} />
-          Export All (CSV)
+          Export My Data (CSV)
         </button>
       </motion.div>
 
-      {/* Stats grid */}
       <div style={{
         display: "grid",
         gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
@@ -219,7 +238,6 @@ export default function HistoryPage() {
         )}
       </div>
 
-      {/* Filters */}
       <div style={{
         display: "flex",
         gap: "0.75rem",
@@ -285,7 +303,6 @@ export default function HistoryPage() {
         </div>
       </div>
 
-      {/* Table */}
       <div style={{
         background: "white",
         borderRadius: "12px",
@@ -336,7 +353,7 @@ export default function HistoryPage() {
                     <p style={{ color: "#6B7280", fontSize: "0.9rem", margin: 0 }}>
                       {search || riskFilter
                         ? "No predictions match your filters"
-                        : "No predictions yet. Run a prediction to see it here!"}
+                        : "No predictions yet in your workspace. Run one from the New Prediction page!"}
                     </p>
                   </td>
                 </tr>
@@ -416,7 +433,6 @@ export default function HistoryPage() {
           </table>
         </div>
 
-        {/* Pagination */}
         {!loading && predictions.length > 0 && (
           <div style={{
             display: "flex",

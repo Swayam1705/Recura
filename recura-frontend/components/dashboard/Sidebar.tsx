@@ -30,20 +30,64 @@ interface SidebarProps {
   setIsOpen: (open: boolean) => void;
 }
 
+// Helper: get logged-in doctor's ID
+function getDoctorId(): string {
+  if (typeof window === "undefined") return "";
+  try {
+    const stored = localStorage.getItem("recura_user");
+    if (stored) {
+      const user = JSON.parse(stored);
+      if (user?.id) return String(user.id);
+    }
+  } catch (e) {
+    console.error(e);
+  }
+  return "";
+}
+
 export default function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
   const pathname = usePathname();
   const width = isOpen ? 280 : 88;
   const [unreadCount, setUnreadCount] = useState(0);
+  const [doctorName, setDoctorName] = useState("Doctor");
+  const [doctorInitials, setDoctorInitials] = useState("DR");
+  const [hospital, setHospital] = useState("");
 
-  // Poll unread notifications every 15s
+  // Load logged-in doctor from localStorage
+  useEffect(() => {
+    const storedUser = localStorage.getItem("recura_user");
+    if (storedUser) {
+      try {
+        const user = JSON.parse(storedUser);
+        setDoctorName(user.name || "Doctor");
+        if (user.hospital) setHospital(user.hospital);
+
+        const cleanName = (user.name || "Doctor").replace(/^Dr\.\s*/i, "").trim();
+        const nameParts = cleanName.split(" ").filter(Boolean);
+        if (nameParts.length >= 2) {
+          setDoctorInitials(
+            (nameParts[0][0] + nameParts[1][0]).toUpperCase()
+          );
+        } else {
+          setDoctorInitials(cleanName.substring(0, 2).toUpperCase());
+        }
+      } catch (e) {
+        console.error("Failed to parse user:", e);
+      }
+    }
+  }, []);
+
+  // Poll unread notifications every 15s, filtered by doctor_id
   useEffect(() => {
     const fetchCount = async () => {
       try {
-        const res = await fetch("http://127.0.0.1:8000/alerts/counts");
+        const docId = getDoctorId();
+        const query = docId ? `?doctor_id=${docId}` : "";
+        const res = await fetch(`http://127.0.0.1:8000/alerts/counts${query}`);
         const data = await res.json();
         setUnreadCount(data.unread || 0);
-      } catch (err) {
-        // Silent fail - don't break sidebar if backend down
+      } catch {
+        // Silent fail if backend is down
       }
     };
     fetchCount();
@@ -51,8 +95,19 @@ export default function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
     return () => clearInterval(interval);
   }, []);
 
+  const handleSignOut = () => {
+    localStorage.removeItem("recura_token");
+    localStorage.removeItem("recura_user");
+    window.location.href = "/login";
+  };
+
   const bottomItems = [
-    { href: "/dashboard/notifications", icon: Bell, label: "Notifications", badge: unreadCount },
+    {
+      href: "/dashboard/notifications",
+      icon: Bell,
+      label: "Notifications",
+      badge: unreadCount,
+    },
     { href: "/dashboard/help", icon: HelpCircle, label: "Help & Support" },
     { href: "/dashboard/settings", icon: Settings, label: "Settings" },
   ];
@@ -75,15 +130,17 @@ export default function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
         boxShadow: "0 4px 20px rgba(0, 0, 0, 0.04)",
       }}
     >
-      <div style={{
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
-        padding: "1.25rem",
-        borderBottom: "1px solid #F3F4F6",
-        height: "80px",
-        flexShrink: 0,
-      }}>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          padding: "1.25rem",
+          borderBottom: "1px solid #F3F4F6",
+          height: "80px",
+          flexShrink: 0,
+        }}
+      >
         <AnimatePresence mode="wait">
           {isOpen ? (
             <motion.div
@@ -93,30 +150,53 @@ export default function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
               exit={{ opacity: 0 }}
               style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}
             >
-              <div style={{
-                width: "40px", height: "40px", borderRadius: "12px",
-                background: "linear-gradient(135deg, #3B82F6, #1D4ED8)",
-                display: "flex", alignItems: "center", justifyContent: "center",
-                boxShadow: "0 4px 12px rgba(59, 130, 246, 0.4)",
-                flexShrink: 0,
-              }}>
+              <div
+                style={{
+                  width: "40px",
+                  height: "40px",
+                  borderRadius: "12px",
+                  background: "linear-gradient(135deg, #3B82F6, #1D4ED8)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  boxShadow: "0 4px 12px rgba(59, 130, 246, 0.4)",
+                  flexShrink: 0,
+                }}
+              >
                 <svg viewBox="0 0 100 100" width="24" height="24">
-                  <path d="M20 55 L35 55 L42 40 L52 68 L60 48 L67 55 L80 55" stroke="white" strokeWidth="6" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+                  <path
+                    d="M20 55 L35 55 L42 40 L52 68 L60 48 L67 55 L80 55"
+                    stroke="white"
+                    strokeWidth="6"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    fill="none"
+                  />
                 </svg>
               </div>
               <div>
-                <div style={{
-                  fontFamily: "var(--font-space)", fontWeight: "700",
-                  color: "#111827", fontSize: "1.25rem",
-                  lineHeight: "1", letterSpacing: "-0.02em",
-                }}>
+                <div
+                  style={{
+                    fontFamily: "var(--font-space)",
+                    fontWeight: "700",
+                    color: "#111827",
+                    fontSize: "1.25rem",
+                    lineHeight: "1",
+                    letterSpacing: "-0.02em",
+                  }}
+                >
                   Recura
                 </div>
-                <div style={{
-                  color: "#2563EB", fontSize: "9px",
-                  fontWeight: "700", letterSpacing: "0.2em",
-                  textTransform: "uppercase", marginTop: "4px",
-                }}>
+                <div
+                  style={{
+                    color: "#2563EB",
+                    fontSize: "9px",
+                    fontWeight: "700",
+                    letterSpacing: "0.2em",
+                    textTransform: "uppercase",
+                    marginTop: "4px",
+                  }}
+                >
                   Clinical AI
                 </div>
               </div>
@@ -128,15 +208,26 @@ export default function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               style={{
-                width: "40px", height: "40px", borderRadius: "12px",
+                width: "40px",
+                height: "40px",
+                borderRadius: "12px",
                 background: "linear-gradient(135deg, #3B82F6, #1D4ED8)",
-                display: "flex", alignItems: "center", justifyContent: "center",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
                 boxShadow: "0 4px 12px rgba(59, 130, 246, 0.4)",
                 margin: "0 auto",
               }}
             >
               <svg viewBox="0 0 100 100" width="24" height="24">
-                <path d="M20 55 L35 55 L42 40 L52 68 L60 48 L67 55 L80 55" stroke="white" strokeWidth="6" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+                <path
+                  d="M20 55 L35 55 L42 40 L52 68 L60 48 L67 55 L80 55"
+                  stroke="white"
+                  strokeWidth="6"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  fill="none"
+                />
               </svg>
             </motion.div>
           )}
@@ -146,75 +237,151 @@ export default function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
           <button
             onClick={() => setIsOpen(false)}
             style={{
-              padding: "8px", borderRadius: "8px",
-              background: "transparent", border: "none",
-              cursor: "pointer", color: "#6B7280",
-              display: "flex", alignItems: "center", justifyContent: "center",
+              padding: "8px",
+              borderRadius: "8px",
+              background: "transparent",
+              border: "none",
+              cursor: "pointer",
+              color: "#6B7280",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
             }}
-            onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = "#F3F4F6"; }}
-            onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "transparent"; }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = "#F3F4F6";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = "transparent";
+            }}
           >
             <ChevronLeft size={18} />
           </button>
         )}
       </div>
 
-      <div style={{ padding: "1rem", borderBottom: "1px solid #F3F4F6", flexShrink: 0 }}>
+      <div
+        style={{
+          padding: "1rem",
+          borderBottom: "1px solid #F3F4F6",
+          flexShrink: 0,
+        }}
+      >
         {isOpen ? (
-          <div style={{
-            display: "flex", alignItems: "center", gap: "0.75rem",
-            padding: "0.75rem", borderRadius: "12px",
-            background: "linear-gradient(135deg, #EFF6FF, #F0F9FF)",
-            border: "1px solid #DBEAFE",
-          }}>
-            <div style={{
-              width: "44px", height: "44px", borderRadius: "50%",
-              background: "linear-gradient(135deg, #3B82F6, #2563EB)",
-              display: "flex", alignItems: "center", justifyContent: "center",
-              color: "white", fontSize: "0.875rem", fontWeight: "700",
-              flexShrink: 0, boxShadow: "0 4px 12px rgba(59, 130, 246, 0.4)",
-            }}>
-              DS
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "0.75rem",
+              padding: "0.75rem",
+              borderRadius: "12px",
+              background: "linear-gradient(135deg, #EFF6FF, #F0F9FF)",
+              border: "1px solid #DBEAFE",
+            }}
+          >
+            <div
+              style={{
+                width: "44px",
+                height: "44px",
+                borderRadius: "50%",
+                background: "linear-gradient(135deg, #3B82F6, #2563EB)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                color: "white",
+                fontSize: "0.875rem",
+                fontWeight: "700",
+                flexShrink: 0,
+                boxShadow: "0 4px 12px rgba(59, 130, 246, 0.4)",
+              }}
+            >
+              {doctorInitials}
             </div>
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ color: "#111827", fontWeight: "700", fontSize: "0.875rem" }}>
-                Dr. Swayam
+              <div
+                style={{
+                  color: "#111827",
+                  fontWeight: "700",
+                  fontSize: "0.875rem",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {doctorName}
               </div>
-              <div style={{ color: "#6B7280", fontSize: "0.75rem", display: "flex", alignItems: "center", gap: "4px" }}>
-                <span style={{ width: "6px", height: "6px", borderRadius: "50%", backgroundColor: "#10B981" }} />
-                Online
+              <div
+                style={{
+                  color: "#6B7280",
+                  fontSize: "0.75rem",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "4px",
+                }}
+              >
+                <span
+                  style={{
+                    width: "6px",
+                    height: "6px",
+                    borderRadius: "50%",
+                    backgroundColor: "#10B981",
+                    flexShrink: 0,
+                  }}
+                />
+                {hospital || "Online"}
               </div>
             </div>
           </div>
         ) : (
-          <div style={{
-            width: "44px", height: "44px", borderRadius: "50%",
-            background: "linear-gradient(135deg, #3B82F6, #2563EB)",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            color: "white", fontSize: "0.875rem", fontWeight: "700",
-            margin: "0 auto", position: "relative",
-            boxShadow: "0 4px 12px rgba(59, 130, 246, 0.4)",
-          }}>
-            DS
-            <div style={{
-              position: "absolute", bottom: "-2px", right: "-2px",
-              width: "14px", height: "14px", borderRadius: "50%",
-              backgroundColor: "#10B981", border: "2px solid white",
-            }} />
+          <div
+            style={{
+              width: "44px",
+              height: "44px",
+              borderRadius: "50%",
+              background: "linear-gradient(135deg, #3B82F6, #2563EB)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              color: "white",
+              fontSize: "0.875rem",
+              fontWeight: "700",
+              margin: "0 auto",
+              position: "relative",
+              boxShadow: "0 4px 12px rgba(59, 130, 246, 0.4)",
+            }}
+          >
+            {doctorInitials}
+            <div
+              style={{
+                position: "absolute",
+                bottom: "-2px",
+                right: "-2px",
+                width: "14px",
+                height: "14px",
+                borderRadius: "50%",
+                backgroundColor: "#10B981",
+                border: "2px solid white",
+              }}
+            />
           </div>
         )}
       </div>
 
       <nav style={{ flex: 1, padding: "0.75rem", overflow: "auto" }}>
         {isOpen && (
-          <div style={{
-            fontSize: "10px", fontWeight: "700",
-            color: "#9CA3AF", textTransform: "uppercase",
-            letterSpacing: "0.15em", padding: "0.75rem 0.75rem 0.5rem",
-          }}>
+          <div
+            style={{
+              fontSize: "10px",
+              fontWeight: "700",
+              color: "#9CA3AF",
+              textTransform: "uppercase",
+              letterSpacing: "0.15em",
+              padding: "0.75rem 0.75rem 0.5rem",
+            }}
+          >
             Main Menu
           </div>
         )}
+
         {navItems.map(({ href, icon: Icon, label }) => {
           const isActive = pathname === href;
           return (
@@ -222,9 +389,14 @@ export default function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
               key={href}
               href={href}
               style={{
-                display: "flex", alignItems: "center", gap: "0.75rem",
-                padding: "0.75rem", borderRadius: "12px", marginBottom: "4px",
-                textDecoration: "none", position: "relative",
+                display: "flex",
+                alignItems: "center",
+                gap: "0.75rem",
+                padding: "0.75rem",
+                borderRadius: "12px",
+                marginBottom: "4px",
+                textDecoration: "none",
+                position: "relative",
                 backgroundColor: isActive ? "#EFF6FF" : "transparent",
                 color: isActive ? "#1D4ED8" : "#4B5563",
                 fontWeight: isActive ? "600" : "500",
@@ -245,30 +417,48 @@ export default function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
               }}
             >
               {isActive && (
-                <div style={{
-                  position: "absolute", left: 0, top: "50%",
-                  transform: "translateY(-50%)", width: "4px", height: "32px",
-                  background: "linear-gradient(to bottom, #3B82F6, #2563EB)",
-                  borderRadius: "0 4px 4px 0",
-                }} />
+                <div
+                  style={{
+                    position: "absolute",
+                    left: 0,
+                    top: "50%",
+                    transform: "translateY(-50%)",
+                    width: "4px",
+                    height: "32px",
+                    background: "linear-gradient(to bottom, #3B82F6, #2563EB)",
+                    borderRadius: "0 4px 4px 0",
+                  }}
+                />
               )}
-              <Icon size={20} strokeWidth={isActive ? 2.5 : 2} style={{ flexShrink: 0 }} />
+              <Icon
+                size={20}
+                strokeWidth={isActive ? 2.5 : 2}
+                style={{ flexShrink: 0 }}
+              />
               {isOpen && (
-                <span style={{ fontSize: "0.875rem", whiteSpace: "nowrap" }}>{label}</span>
+                <span style={{ fontSize: "0.875rem", whiteSpace: "nowrap" }}>
+                  {label}
+                </span>
               )}
             </Link>
           );
         })}
 
         {isOpen && (
-          <div style={{
-            fontSize: "10px", fontWeight: "700",
-            color: "#9CA3AF", textTransform: "uppercase",
-            letterSpacing: "0.15em", padding: "1.5rem 0.75rem 0.5rem",
-          }}>
+          <div
+            style={{
+              fontSize: "10px",
+              fontWeight: "700",
+              color: "#9CA3AF",
+              textTransform: "uppercase",
+              letterSpacing: "0.15em",
+              padding: "1.5rem 0.75rem 0.5rem",
+            }}
+          >
             Account
           </div>
         )}
+
         {bottomItems.map(({ href, icon: Icon, label, badge }) => {
           const isActive = pathname === href;
           const hasBadge = badge !== undefined && badge > 0;
@@ -277,8 +467,12 @@ export default function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
               key={href}
               href={href}
               style={{
-                display: "flex", alignItems: "center", gap: "0.75rem",
-                padding: "0.75rem", borderRadius: "12px", marginBottom: "4px",
+                display: "flex",
+                alignItems: "center",
+                gap: "0.75rem",
+                padding: "0.75rem",
+                borderRadius: "12px",
+                marginBottom: "4px",
                 textDecoration: "none",
                 backgroundColor: isActive ? "#EFF6FF" : "transparent",
                 color: isActive ? "#1D4ED8" : "#4B5563",
@@ -290,28 +484,33 @@ export default function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
                 if (!isActive) e.currentTarget.style.backgroundColor = "#F9FAFB";
               }}
               onMouseLeave={(e) => {
-                if (!isActive) e.currentTarget.style.backgroundColor = "transparent";
+                if (!isActive)
+                  e.currentTarget.style.backgroundColor = "transparent";
               }}
             >
               <div style={{ position: "relative", flexShrink: 0 }}>
                 <Icon size={20} strokeWidth={2} />
                 {!isOpen && hasBadge && (
-                  <span style={{
-                    position: "absolute",
-                    top: -6, right: -6,
-                    minWidth: 16, height: 16,
-                    padding: "0 4px",
-                    backgroundColor: "#EF4444",
-                    color: "white",
-                    fontSize: "9px",
-                    fontWeight: "700",
-                    borderRadius: "9999px",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    border: "2px solid white",
-                    animation: hasBadge ? "pulse 2s infinite" : "none",
-                  }}>
+                  <span
+                    style={{
+                      position: "absolute",
+                      top: -6,
+                      right: -6,
+                      minWidth: 16,
+                      height: 16,
+                      padding: "0 4px",
+                      backgroundColor: "#EF4444",
+                      color: "white",
+                      fontSize: "9px",
+                      fontWeight: "700",
+                      borderRadius: "9999px",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      border: "2px solid white",
+                      animation: "pulse 2s infinite",
+                    }}
+                  >
                     {badge > 99 ? "99+" : badge}
                   </span>
                 )}
@@ -320,15 +519,17 @@ export default function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
                 <>
                   <span style={{ fontSize: "0.875rem", flex: 1 }}>{label}</span>
                   {hasBadge && (
-                    <span style={{
-                      backgroundColor: "#EF4444",
-                      color: "white",
-                      fontSize: "10px",
-                      fontWeight: "700",
-                      padding: "2px 8px",
-                      borderRadius: "9999px",
-                      animation: "pulse 2s infinite",
-                    }}>
+                    <span
+                      style={{
+                        backgroundColor: "#EF4444",
+                        color: "white",
+                        fontSize: "10px",
+                        fontWeight: "700",
+                        padding: "2px 8px",
+                        borderRadius: "9999px",
+                        animation: "pulse 2s infinite",
+                      }}
+                    >
                       {badge > 99 ? "99+" : badge}
                     </span>
                   )}
@@ -339,32 +540,61 @@ export default function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
         })}
       </nav>
 
-      <div style={{ padding: "0.75rem", borderTop: "1px solid #F3F4F6", flexShrink: 0 }}>
+      <div
+        style={{
+          padding: "0.75rem",
+          borderTop: "1px solid #F3F4F6",
+          flexShrink: 0,
+        }}
+      >
         {!isOpen && (
           <button
             onClick={() => setIsOpen(true)}
             style={{
-              width: "100%", padding: "8px", borderRadius: "8px",
-              background: "transparent", border: "none", cursor: "pointer",
-              color: "#6B7280", display: "flex", justifyContent: "center",
+              width: "100%",
+              padding: "8px",
+              borderRadius: "8px",
+              background: "transparent",
+              border: "none",
+              cursor: "pointer",
+              color: "#6B7280",
+              display: "flex",
+              justifyContent: "center",
               marginBottom: "8px",
             }}
-            onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = "#F3F4F6"; }}
-            onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "transparent"; }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = "#F3F4F6";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = "transparent";
+            }}
           >
             <ChevronLeft size={18} style={{ transform: "rotate(180deg)" }} />
           </button>
         )}
-        <button style={{
-          width: "100%", display: "flex", alignItems: "center", gap: "0.75rem",
-          padding: "0.75rem", borderRadius: "12px",
-          color: "#DC2626", background: "transparent",
-          border: "none", cursor: "pointer",
-          fontSize: "0.875rem", fontWeight: "600",
-          justifyContent: isOpen ? "flex-start" : "center",
-        }}
-        onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = "#FEF2F2"; }}
-        onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "transparent"; }}
+        <button
+          onClick={handleSignOut}
+          style={{
+            width: "100%",
+            display: "flex",
+            alignItems: "center",
+            gap: "0.75rem",
+            padding: "0.75rem",
+            borderRadius: "12px",
+            color: "#DC2626",
+            background: "transparent",
+            border: "none",
+            cursor: "pointer",
+            fontSize: "0.875rem",
+            fontWeight: "600",
+            justifyContent: isOpen ? "flex-start" : "center",
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.backgroundColor = "#FEF2F2";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.backgroundColor = "transparent";
+          }}
         >
           <LogOut size={20} strokeWidth={2} />
           {isOpen && "Sign Out"}
@@ -373,8 +603,15 @@ export default function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
 
       <style jsx>{`
         @keyframes pulse {
-          0%, 100% { opacity: 1; transform: scale(1); }
-          50% { opacity: 0.7; transform: scale(1.1); }
+          0%,
+          100% {
+            opacity: 1;
+            transform: scale(1);
+          }
+          50% {
+            opacity: 0.7;
+            transform: scale(1.1);
+          }
         }
       `}</style>
     </motion.aside>

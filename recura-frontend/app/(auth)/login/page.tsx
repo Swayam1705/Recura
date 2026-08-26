@@ -1,245 +1,343 @@
 "use client";
 
 import { useState } from "react";
-import { motion } from "framer-motion";
-import Link from "next/link";
-import { Eye, EyeOff, Loader2, Lock, Mail, ArrowRight, Shield } from "lucide-react";
 import { useRouter } from "next/navigation";
-import Logo from "@/components/ui/Logo";
+import Link from "next/link";
+import { Activity, Lock, Mail, Loader2, ArrowLeft } from "lucide-react";
+import { motion } from "framer-motion";
 
 export default function LoginPage() {
   const router = useRouter();
-  const [showPassword, setShowPassword] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-  const [formData, setFormData] = useState({ email: "", password: "" });
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsLoading(true);
+    setLoading(true);
     setError("");
+
     try {
-      await new Promise((resolve) => setTimeout(resolve, 1500));
+      const res = await fetch("http://127.0.0.1:8000/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || "Login failed");
+
+      localStorage.setItem("recura_token", data.token);
+      localStorage.setItem("recura_user", JSON.stringify(data.doctor));
       router.push("/dashboard");
-    } catch (err) {
-      setError("Invalid email or password. Please try again.");
+    } catch (err: any) {
+      setError(err.message || "Login failed");
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
   };
 
   return (
-    <div className="auth-container relative overflow-hidden">
-      <div className="absolute inset-0 grid-bg opacity-40 pointer-events-none" />
-      <div className="absolute top-0 left-1/4 w-[500px] h-[500px] bg-blue-100 opacity-60 rounded-full blur-[120px] pointer-events-none" />
-      <div className="absolute bottom-0 right-1/4 w-[500px] h-[500px] bg-cyan-100 opacity-60 rounded-full blur-[120px] pointer-events-none" />
-
+    <div
+      style={{
+        minHeight: "100vh",
+        width: "100%",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: "2rem 1.25rem",
+        background:
+          "radial-gradient(ellipse at top, #EFF6FF 0%, #F8FAFC 45%, #FFFFFF 100%)",
+        boxSizing: "border-box",
+      }}
+    >
       <motion.div
-        initial={{ opacity: 0, y: 20 }}
+        initial={{ opacity: 0, y: 24 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5 }}
-        className="auth-card relative z-10"
+        transition={{ duration: 0.45 }}
+        style={{
+          width: "100%",
+          maxWidth: "440px",
+          margin: "0 auto",
+        }}
       >
-        <div style={{ textAlign: "center", marginBottom: "2.5rem" }}>
-          <Link href="/" style={{ display: "inline-flex", justifyContent: "center", marginBottom: "2rem" }}>
-            <motion.div
-              whileHover={{ scale: 1.05 }}
-              transition={{ type: "spring", stiffness: 300 }}
-            >
-              <Logo size="lg" showText />
-            </motion.div>
+        {/* Back home */}
+        <div style={{ marginBottom: "1.5rem", textAlign: "center" }}>
+          <Link
+            href="/"
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "0.4rem",
+              color: "#64748B",
+              textDecoration: "none",
+              fontSize: "0.85rem",
+              fontWeight: 600,
+            }}
+          >
+            <ArrowLeft size={16} /> Back to home
           </Link>
-          <h1 style={{
-            fontSize: "2.5rem",
-            fontWeight: "700",
-            color: "#111827",
-            marginBottom: "0.75rem",
-            letterSpacing: "-0.025em",
-            fontFamily: "var(--font-space)",
-          }}>
-            Welcome Back
+        </div>
+
+        {/* Logo */}
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            marginBottom: "2rem",
+            textAlign: "center",
+          }}
+        >
+          <div
+            style={{
+              width: "56px",
+              height: "56px",
+              borderRadius: "16px",
+              background: "linear-gradient(135deg, #2563EB, #1D4ED8)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              boxShadow: "0 12px 30px rgba(37, 99, 235, 0.35)",
+              marginBottom: "1rem",
+            }}
+          >
+            <Activity size={28} color="white" strokeWidth={2.5} />
+          </div>
+          <h1
+            style={{
+              margin: 0,
+              fontSize: "1.75rem",
+              fontWeight: 800,
+              color: "#0F172A",
+              letterSpacing: "-0.02em",
+            }}
+          >
+            Welcome back
           </h1>
-          <p style={{ color: "#4B5563", fontSize: "1rem" }}>
-            Sign in to access your clinical dashboard
+          <p
+            style={{
+              margin: "0.5rem 0 0",
+              color: "#64748B",
+              fontSize: "0.95rem",
+              lineHeight: 1.5,
+            }}
+          >
+            Sign in to your Recura clinical account
           </p>
         </div>
 
-        <div style={{
-          backgroundColor: "white",
-          border: "1px solid #E5E7EB",
-          borderRadius: "1.5rem",
-          padding: "2.5rem",
-          boxShadow: "0 20px 60px -15px rgba(59, 130, 246, 0.15)",
-        }}>
-          <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
-            <div>
-              <label style={{ display: "block", fontSize: "0.875rem", fontWeight: "700", color: "#374151", marginBottom: "0.5rem" }}>
-                Email Address
-              </label>
-              <div style={{ position: "relative" }}>
-                <Mail size={18} style={{ position: "absolute", left: "1rem", top: "50%", transform: "translateY(-50%)", color: "#9CA3AF" }} />
-                <input
-                  type="email"
-                  required
-                  value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  placeholder="doctor@hospital.com"
-                  style={{
-                    width: "100%",
-                    paddingLeft: "3rem",
-                    paddingRight: "1rem",
-                    paddingTop: "0.875rem",
-                    paddingBottom: "0.875rem",
-                    borderRadius: "0.75rem",
-                    backgroundColor: "#F9FAFB",
-                    border: "2px solid #E5E7EB",
-                    color: "#111827",
-                    fontSize: "1rem",
-                    transition: "all 0.2s",
-                  }}
-                  onFocus={(e) => {
-                    e.target.style.borderColor = "#3B82F6";
-                    e.target.style.backgroundColor = "white";
-                    e.target.style.boxShadow = "0 0 0 4px rgba(59, 130, 246, 0.1)";
-                  }}
-                  onBlur={(e) => {
-                    e.target.style.borderColor = "#E5E7EB";
-                    e.target.style.backgroundColor = "#F9FAFB";
-                    e.target.style.boxShadow = "none";
-                  }}
-                />
-              </div>
-            </div>
-
-            <div>
-              <label style={{ display: "block", fontSize: "0.875rem", fontWeight: "700", color: "#374151", marginBottom: "0.5rem" }}>
-                Password
-              </label>
-              <div style={{ position: "relative" }}>
-                <Lock size={18} style={{ position: "absolute", left: "1rem", top: "50%", transform: "translateY(-50%)", color: "#9CA3AF" }} />
-                <input
-                  type={showPassword ? "text" : "password"}
-                  required
-                  value={formData.password}
-                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                  placeholder="Enter your password"
-                  style={{
-                    width: "100%",
-                    paddingLeft: "3rem",
-                    paddingRight: "3rem",
-                    paddingTop: "0.875rem",
-                    paddingBottom: "0.875rem",
-                    borderRadius: "0.75rem",
-                    backgroundColor: "#F9FAFB",
-                    border: "2px solid #E5E7EB",
-                    color: "#111827",
-                    fontSize: "1rem",
-                    transition: "all 0.2s",
-                  }}
-                  onFocus={(e) => {
-                    e.target.style.borderColor = "#3B82F6";
-                    e.target.style.backgroundColor = "white";
-                    e.target.style.boxShadow = "0 0 0 4px rgba(59, 130, 246, 0.1)";
-                  }}
-                  onBlur={(e) => {
-                    e.target.style.borderColor = "#E5E7EB";
-                    e.target.style.backgroundColor = "#F9FAFB";
-                    e.target.style.boxShadow = "none";
-                  }}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  style={{ position: "absolute", right: "1rem", top: "50%", transform: "translateY(-50%)", color: "#9CA3AF", background: "none", border: "none" }}
-                >
-                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                </button>
-              </div>
-            </div>
-
+        {/* Card */}
+        <div
+          style={{
+            background: "white",
+            borderRadius: "1.5rem",
+            padding: "2rem 1.75rem",
+            border: "1px solid #E2E8F0",
+            boxShadow: "0 20px 50px rgba(15, 23, 42, 0.08)",
+          }}
+        >
+          <form
+            onSubmit={handleLogin}
+            style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}
+          >
             {error && (
-              <div style={{ color: "#B91C1C", fontSize: "0.875rem", backgroundColor: "#FEF2F2", border: "2px solid #FECACA", borderRadius: "0.75rem", padding: "0.75rem 1rem", fontWeight: "500" }}>
+              <div
+                style={{
+                  background: "#FEF2F2",
+                  border: "1px solid #FECACA",
+                  color: "#B91C1C",
+                  padding: "0.85rem 1rem",
+                  borderRadius: "0.85rem",
+                  fontSize: "0.875rem",
+                  fontWeight: 600,
+                  textAlign: "center",
+                }}
+              >
                 {error}
               </div>
             )}
 
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: "0.875rem" }}>
-              <label style={{ display: "flex", alignItems: "center", gap: "0.5rem", color: "#4B5563", cursor: "pointer", fontWeight: "500" }}>
-                <input type="checkbox" style={{ width: "1rem", height: "1rem" }} />
-                Remember me
-              </label>
-              <Link
-                href="#"
-                style={{ color: "#2563EB", fontWeight: "700", textDecoration: "none" }}
+            {/* Email */}
+            <div>
+              <label
+                style={{
+                  display: "block",
+                  fontSize: "0.8rem",
+                  fontWeight: 700,
+                  color: "#334155",
+                  marginBottom: "0.5rem",
+                }}
               >
-                Forgot password?
-              </Link>
+                Clinical Email
+              </label>
+              <div style={{ position: "relative" }}>
+                <Mail
+                  size={18}
+                  color="#94A3B8"
+                  style={{
+                    position: "absolute",
+                    left: "14px",
+                    top: "50%",
+                    transform: "translateY(-50%)",
+                    pointerEvents: "none",
+                  }}
+                />
+                <input
+                  type="email"
+                  required
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="doctor@hospital.com"
+                  style={{
+                    width: "100%",
+                    boxSizing: "border-box",
+                    padding: "0.9rem 1rem 0.9rem 2.75rem",
+                    borderRadius: "0.9rem",
+                    border: "1.5px solid #E2E8F0",
+                    fontSize: "0.95rem",
+                    color: "#0F172A",
+                    outline: "none",
+                    background: "#F8FAFC",
+                  }}
+                  onFocus={(e) => {
+                    e.currentTarget.style.borderColor = "#2563EB";
+                    e.currentTarget.style.background = "white";
+                    e.currentTarget.style.boxShadow =
+                      "0 0 0 4px rgba(37,99,235,0.12)";
+                  }}
+                  onBlur={(e) => {
+                    e.currentTarget.style.borderColor = "#E2E8F0";
+                    e.currentTarget.style.background = "#F8FAFC";
+                    e.currentTarget.style.boxShadow = "none";
+                  }}
+                />
+              </div>
+            </div>
+
+            {/* Password */}
+            <div>
+              <label
+                style={{
+                  display: "block",
+                  fontSize: "0.8rem",
+                  fontWeight: 700,
+                  color: "#334155",
+                  marginBottom: "0.5rem",
+                }}
+              >
+                Password
+              </label>
+              <div style={{ position: "relative" }}>
+                <Lock
+                  size={18}
+                  color="#94A3B8"
+                  style={{
+                    position: "absolute",
+                    left: "14px",
+                    top: "50%",
+                    transform: "translateY(-50%)",
+                    pointerEvents: "none",
+                  }}
+                />
+                <input
+                  type="password"
+                  required
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="••••••••"
+                  style={{
+                    width: "100%",
+                    boxSizing: "border-box",
+                    padding: "0.9rem 1rem 0.9rem 2.75rem",
+                    borderRadius: "0.9rem",
+                    border: "1.5px solid #E2E8F0",
+                    fontSize: "0.95rem",
+                    color: "#0F172A",
+                    outline: "none",
+                    background: "#F8FAFC",
+                  }}
+                  onFocus={(e) => {
+                    e.currentTarget.style.borderColor = "#2563EB";
+                    e.currentTarget.style.background = "white";
+                    e.currentTarget.style.boxShadow =
+                      "0 0 0 4px rgba(37,99,235,0.12)";
+                  }}
+                  onBlur={(e) => {
+                    e.currentTarget.style.borderColor = "#E2E8F0";
+                    e.currentTarget.style.background = "#F8FAFC";
+                    e.currentTarget.style.boxShadow = "none";
+                  }}
+                />
+              </div>
             </div>
 
             <button
               type="submit"
-              disabled={isLoading}
+              disabled={loading}
               style={{
                 width: "100%",
-                paddingTop: "1rem",
-                paddingBottom: "1rem",
-                borderRadius: "0.75rem",
-                background: "linear-gradient(to right, #2563EB, #1D4ED8)",
-                fontWeight: "700",
-                color: "white",
-                fontSize: "1rem",
+                marginTop: "0.35rem",
+                padding: "0.95rem 1.25rem",
+                borderRadius: "0.95rem",
                 border: "none",
-                cursor: "pointer",
+                background: loading
+                  ? "#93C5FD"
+                  : "linear-gradient(135deg, #2563EB, #1D4ED8)",
+                color: "white",
+                fontWeight: 700,
+                fontSize: "0.95rem",
+                cursor: loading ? "not-allowed" : "pointer",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
                 gap: "0.5rem",
-                boxShadow: "0 10px 25px -5px rgba(59, 130, 246, 0.4)",
-                transition: "all 0.3s",
-                opacity: isLoading ? 0.5 : 1,
-              }}
-              onMouseEnter={(e) => {
-                if (!isLoading) {
-                  e.currentTarget.style.transform = "scale(1.02)";
-                  e.currentTarget.style.boxShadow = "0 20px 40px -10px rgba(59, 130, 246, 0.5)";
-                }
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.transform = "scale(1)";
-                e.currentTarget.style.boxShadow = "0 10px 25px -5px rgba(59, 130, 246, 0.4)";
+                boxShadow: "0 12px 28px rgba(37, 99, 235, 0.3)",
               }}
             >
-              {isLoading ? (
+              {loading ? (
                 <>
-                  <Loader2 size={20} className="animate-spin" />
-                  Signing in...
+                  <Loader2 size={18} className="animate-spin" /> Signing in...
                 </>
               ) : (
-                <>
-                  Sign In
-                  <ArrowRight size={18} />
-                </>
+                "Sign In"
               )}
             </button>
           </form>
 
-          <div style={{ marginTop: "2rem", paddingTop: "2rem", borderTop: "1px solid #F3F4F6", textAlign: "center" }}>
-            <p style={{ color: "#4B5563", fontSize: "1rem" }}>
-              Do not have an account?{" "}
-              <Link
-                href="/signup"
-                style={{ color: "#2563EB", fontWeight: "700", textDecoration: "none" }}
-              >
-                Request Access
-              </Link>
-            </p>
-          </div>
+          <p
+            style={{
+              marginTop: "1.5rem",
+              textAlign: "center",
+              fontSize: "0.9rem",
+              color: "#64748B",
+            }}
+          >
+            New doctor?{" "}
+            <Link
+              href="/signup"
+              style={{
+                color: "#2563EB",
+                fontWeight: 700,
+                textDecoration: "none",
+              }}
+            >
+              Create clinical account
+            </Link>
+          </p>
         </div>
 
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "0.5rem", marginTop: "2rem", color: "#6B7280", fontSize: "0.875rem", fontWeight: "500" }}>
-          <Shield size={14} />
-          Protected by enterprise-grade encryption
-        </div>
+        <p
+          style={{
+            marginTop: "1.5rem",
+            textAlign: "center",
+            fontSize: "0.75rem",
+            color: "#94A3B8",
+          }}
+        >
+          For authorized clinicians only · Capstone research system
+        </p>
       </motion.div>
     </div>
   );

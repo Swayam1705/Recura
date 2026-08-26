@@ -2,24 +2,32 @@
 
 import { motion } from "framer-motion";
 import Link from "next/link";
-import { ArrowRight, Play, Shield, Zap, Brain } from "lucide-react";
+import { Shield, Zap, Brain } from "lucide-react";
 import DashboardPreview from "./DashboardPreview";
 
 const badges = [
-  { icon: Shield, text: "HIPAA Compliant" },
+  { icon: Shield, text: "Privacy First" },
   { icon: Zap, text: "Federated Learning" },
   { icon: Brain, text: "Explainable AI" },
 ];
 
 const stats = [
-  { value: "99.2%", label: "Model Accuracy" },
-  { value: "2,400+", label: "Active Doctors" },
-  { value: "156", label: "Hospitals" },
+  { value: "98.7%", label: "Model Accuracy" },
+  { value: "1D-CNN", label: "Core Architecture" },
+  { value: "XAI", label: "SHAP + LIME" },
+];
+
+const navItems = [
+  { label: "Features", href: "#features" },
+  { label: "How It Works", href: "#how-it-works" },
+  { label: "Methodology", href: "#methodology" },
+  { label: "FAQ", href: "#faq" },
 ];
 
 export default function Hero() {
   return (
     <section style={{ position: "relative", minHeight: "100vh", overflow: "hidden" }}>
+      {/* Background video */}
       <div style={{ position: "absolute", inset: 0, zIndex: 0 }}>
         <video
           autoPlay
@@ -46,12 +54,10 @@ export default function Hero() {
         }} />
       </div>
 
+      {/* Ambient blobs */}
       <div style={{ position: "absolute", inset: 0, zIndex: 1, overflow: "hidden", pointerEvents: "none" }}>
         <motion.div
-          animate={{
-            x: [0, 100, 0],
-            y: [0, -50, 0],
-          }}
+          animate={{ x: [0, 100, 0], y: [0, -50, 0] }}
           transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
           style={{
             position: "absolute",
@@ -65,10 +71,7 @@ export default function Hero() {
           }}
         />
         <motion.div
-          animate={{
-            x: [0, -100, 0],
-            y: [0, 50, 0],
-          }}
+          animate={{ x: [0, -100, 0], y: [0, 50, 0] }}
           transition={{ duration: 25, repeat: Infinity, ease: "linear" }}
           style={{
             position: "absolute",
@@ -83,6 +86,7 @@ export default function Hero() {
         />
       </div>
 
+      {/* ===== NAVBAR (inside Hero) ===== */}
       <nav style={{
         position: "absolute",
         top: 0,
@@ -102,6 +106,7 @@ export default function Hero() {
           justifyContent: "space-between",
           gap: "2rem",
         }}>
+          {/* Logo */}
           <Link href="/" style={{ display: "flex", alignItems: "center", gap: "0.75rem", textDecoration: "none" }}>
             <div style={{
               width: "44px",
@@ -148,11 +153,24 @@ export default function Hero() {
             </div>
           </Link>
 
-          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", padding: "0.5rem 0.75rem", borderRadius: "9999px", backdropFilter: "blur(16px)", backgroundColor: "rgba(255, 255, 255, 0.1)", border: "1px solid rgba(255, 255, 255, 0.15)" }} className="hidden lg:flex">
-            {["Features", "How It Works", "Security", "Pricing"].map((item) => (
+          {/* Center links */}
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "0.5rem",
+              padding: "0.5rem 0.75rem",
+              borderRadius: "9999px",
+              backdropFilter: "blur(16px)",
+              backgroundColor: "rgba(255, 255, 255, 0.1)",
+              border: "1px solid rgba(255, 255, 255, 0.15)",
+            }}
+            className="hidden lg:flex"
+          >
+            {navItems.map((item) => (
               <Link
-                key={item}
-                href={`#${item.toLowerCase().replace(" ", "-")}`}
+                key={item.href}
+                href={item.href}
                 style={{
                   color: "rgba(255, 255, 255, 0.8)",
                   textDecoration: "none",
@@ -172,11 +190,12 @@ export default function Hero() {
                   e.currentTarget.style.backgroundColor = "transparent";
                 }}
               >
-                {item}
+                {item.label}
               </Link>
             ))}
           </div>
 
+          {/* Right actions: Sign In · Sign Up only */}
           <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }} className="hidden lg:flex">
             <Link
               href="/login"
@@ -186,17 +205,26 @@ export default function Hero() {
                 fontWeight: "600",
                 color: "rgba(255, 255, 255, 0.9)",
                 textDecoration: "none",
+                borderRadius: "0.75rem",
+                transition: "all 0.2s",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.08)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = "transparent";
               }}
             >
               Sign In
             </Link>
+
             <Link
-              href="/dashboard"
+              href="/signup"
               style={{
                 display: "flex",
                 alignItems: "center",
-                gap: "0.5rem",
-                padding: "0.75rem 1.5rem",
+                gap: "0.4rem",
+                padding: "0.75rem 1.35rem",
                 fontSize: "0.875rem",
                 fontWeight: "700",
                 color: "white",
@@ -214,13 +242,13 @@ export default function Hero() {
                 e.currentTarget.style.transform = "scale(1)";
               }}
             >
-              Get Started
-              <ArrowRight size={16} />
+              Sign Up
             </Link>
           </div>
         </div>
       </nav>
 
+      {/* ===== HERO CONTENT ===== */}
       <div style={{
         position: "relative",
         zIndex: 10,
@@ -230,16 +258,19 @@ export default function Hero() {
         paddingTop: "8rem",
         paddingBottom: "6rem",
       }}>
-        <div style={{
-          maxWidth: "1400px",
-          width: "100%",
-          margin: "0 auto",
-          padding: "0 2rem",
-          display: "grid",
-          gridTemplateColumns: "1fr",
-          gap: "4rem",
-          alignItems: "center",
-        }} className="hero-grid">
+        <div
+          style={{
+            maxWidth: "1400px",
+            width: "100%",
+            margin: "0 auto",
+            padding: "0 2rem",
+            display: "grid",
+            gridTemplateColumns: "1fr",
+            gap: "4rem",
+            alignItems: "center",
+          }}
+          className="hero-grid"
+        >
           <div style={{ maxWidth: "700px" }}>
             <motion.div
               initial={{ opacity: 0, y: 30 }}
@@ -277,10 +308,16 @@ export default function Hero() {
                 }} />
               </span>
               <span style={{ color: "white", fontSize: "0.875rem", fontWeight: "600" }}>
-                Live in Clinical Beta
+                Capstone Clinical AI Research
               </span>
-              <span style={{ color: "#93C5FD", fontSize: "0.75rem", fontWeight: "500", borderLeft: "1px solid rgba(255, 255, 255, 0.2)", paddingLeft: "0.75rem" }}>
-                v2.4.1
+              <span style={{
+                color: "#93C5FD",
+                fontSize: "0.75rem",
+                fontWeight: "500",
+                borderLeft: "1px solid rgba(255, 255, 255, 0.2)",
+                paddingLeft: "0.75rem",
+              }}>
+                v4.1
               </span>
             </motion.div>
 
@@ -323,16 +360,17 @@ export default function Hero() {
                 fontWeight: "300",
               }}
             >
-              Enterprise-grade{" "}
-              <span style={{ color: "white", fontWeight: "500" }}>explainable AI</span> trained
-              on federated hospital networks with complete patient privacy.
+              Research-grade{" "}
+              <span style={{ color: "white", fontWeight: "500" }}>explainable AI</span> for
+              clinical decision support — with SHAP transparency, note parsing, patient history,
+              and high-risk alerts.
             </motion.p>
 
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ delay: 0.9 }}
-              style={{ display: "flex", flexWrap: "wrap", gap: "0.75rem", marginBottom: "2.5rem" }}
+              style={{ display: "flex", flexWrap: "wrap", gap: "0.75rem", marginBottom: "3.5rem" }}
             >
               {badges.map(({ icon: Icon, text }) => (
                 <div
@@ -357,73 +395,11 @@ export default function Hero() {
               ))}
             </motion.div>
 
+            {/* CTAs moved to navbar. Stats immediately below description. */}
             <motion.div
               initial={{ opacity: 0, y: 30 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 1.1, duration: 0.8 }}
-              style={{ display: "flex", flexWrap: "wrap", gap: "1rem", marginBottom: "3rem" }}
-            >
-              <Link
-                href="/dashboard"
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: "0.75rem",
-                  padding: "1rem 2rem",
-                  borderRadius: "1rem",
-                  fontWeight: "700",
-                  color: "white",
-                  fontSize: "1rem",
-                  background: "linear-gradient(to right, #3B82F6, #2563EB)",
-                  boxShadow: "0 20px 50px rgba(59, 130, 246, 0.5)",
-                  textDecoration: "none",
-                  transition: "all 0.3s",
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.transform = "scale(1.05)";
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.transform = "scale(1)";
-                }}
-              >
-                Launch Dashboard
-                <ArrowRight size={20} />
-              </Link>
-              <button style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                gap: "0.75rem",
-                padding: "1rem 2rem",
-                borderRadius: "1rem",
-                fontWeight: "700",
-                color: "white",
-                fontSize: "1rem",
-                backdropFilter: "blur(16px)",
-                backgroundColor: "rgba(255, 255, 255, 0.1)",
-                border: "2px solid rgba(255, 255, 255, 0.2)",
-                cursor: "pointer",
-              }}>
-                <div style={{
-                  width: "32px",
-                  height: "32px",
-                  borderRadius: "9999px",
-                  backgroundColor: "rgba(255, 255, 255, 0.2)",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                }}>
-                  <Play size={13} fill="white" color="white" style={{ marginLeft: "2px" }} />
-                </div>
-                Watch Demo
-              </button>
-            </motion.div>
-
-            <motion.div
-              initial={{ opacity: 0, y: 30 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 1.3, duration: 0.8 }}
               style={{
                 display: "flex",
                 gap: "3rem",
@@ -443,7 +419,12 @@ export default function Hero() {
                   }}>
                     {stat.value}
                   </div>
-                  <div style={{ color: "rgba(255, 255, 255, 0.7)", fontSize: "0.875rem", marginTop: "0.5rem", fontWeight: "500" }}>
+                  <div style={{
+                    color: "rgba(255, 255, 255, 0.7)",
+                    fontSize: "0.875rem",
+                    marginTop: "0.5rem",
+                    fontWeight: "500",
+                  }}>
                     {stat.label}
                   </div>
                 </div>

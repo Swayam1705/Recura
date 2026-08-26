@@ -105,6 +105,21 @@ const defaultFormData = {
   Pathology: "Papillary",
 };
 
+// Helper to get logged-in doctor ID from localStorage
+function getLoggedInDoctorId(): number {
+  if (typeof window === "undefined") return 1;
+  try {
+    const stored = localStorage.getItem("recura_user");
+    if (stored) {
+      const user = JSON.parse(stored);
+      if (user?.id) return Number(user.id);
+    }
+  } catch (e) {
+    console.error("Error reading doctor ID:", e);
+  }
+  return 1;
+}
+
 export default function PredictionForm({ onResult, prefillData }: PredictionFormProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -161,9 +176,12 @@ export default function PredictionForm({ onResult, prefillData }: PredictionForm
     setError(null);
 
     try {
+      const doctorId = getLoggedInDoctorId();
+
       const payload = {
         ...formData,
         patient_id: patientId.trim() || null,
+        doctor_id: doctorId,
       };
 
       const response = await fetch("http://127.0.0.1:8000/predict", {
@@ -268,7 +286,6 @@ export default function PredictionForm({ onResult, prefillData }: PredictionForm
       </div>
 
       <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
-        {/* Patient ID Field */}
         <PatientIdField
           value={patientId}
           onChange={setPatientId}

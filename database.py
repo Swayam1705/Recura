@@ -1,6 +1,6 @@
 """
 Recura Patient History Database (SQLite)
-Auto-saves every prediction for longitudinal tracking.
+Auto-saves every prediction for longitudinal tracking with doctor-level data isolation.
 """
 
 import sqlite3
@@ -15,11 +15,13 @@ DB_PATH = BASE_DIR / "recura_history.db"
 
 
 def init_db():
-    """Create tables if they don't exist"""
+    """Create tables and migrate schema if needed"""
     with get_conn() as conn:
-        conn.executescript("""
+        # 1. Create base tables
+        conn.execute("""
         CREATE TABLE IF NOT EXISTS predictions (
             id                    INTEGER PRIMARY KEY AUTOINCREMENT,
+            doctor_id             INTEGER DEFAULT 1,
             patient_id            TEXT NOT NULL,
             age                   INTEGER,
             pathology             TEXT,
@@ -37,11 +39,39 @@ def init_db():
             input_data_json       TEXT,
             created_at            TEXT DEFAULT (datetime('now', 'localtime'))
         );
-
-        CREATE INDEX IF NOT EXISTS idx_patient_id ON predictions(patient_id);
-        CREATE INDEX IF NOT EXISTS idx_risk_level ON predictions(risk_level);
-        CREATE INDEX IF NOT EXISTS idx_created_at ON predictions(created_at DESC);
         """)
+
+        conn.execute("""
+        CREATE TABLE IF NOT EXISTS doctors (
+            id                    INTEGER PRIMARY KEY AUTOINCREMENT,
+            name                  TEXT NOT NULL,
+            email                 TEXT UNIQUE NOT NULL,
+            hospital              TEXT,
+            password_hash         TEXT NOT NULL,
+            created_at            TEXT DEFAULT (datetime('now', 'localtime'))
+        );
+        """)
+
+        # 2. Check and migrate column FIRST if old db file exists
+        cursor = conn.execute("PRAGMA table_info(predictions)")
+        columns = [col["name"] for col in cursor.fetchall()]
+        if "doctor_id" not in columns:
+            conn.execute("ALTER TABLE predictions ADD COLUMN doctor_id INTEGER DEFAULT 1")
+            print("Migrated schema: Added doctor_id to predictions table")
+
+        # 3. Create indexes AFTER migration is done
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_patient_id ON predictions(patient_id);")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_risk_level ON predictions(risk_level);")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_created_at ON predictions(created_at DESC);")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_doctor_id ON predictions(doctor_id);")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_doctor_email ON doctors(email);")
+        
+        # Auto-migration: check if doctor_id exists in predictions
+        cursor = conn.execute("PRAGMA table_info(predictions)")
+        columns = [col["name"] for col in cursor.fetchall()]
+        if "doctor_id" not in columns:
+            conn.execute("ALTER TABLE predictions ADD COLUMN doctor_id INTEGER DEFAULT 1")
+            print("Migrated schema: Added doctor_id to predictions table")
 
 
 @contextmanager
@@ -58,17 +88,18 @@ def get_conn():
         conn.close()
 
 
-def save_prediction(patient_input: dict, prediction_result: dict) -> int:
-    """Save a prediction to database. Returns new row ID."""
+def save_prediction(patient_input: dict, prediction_result: dict, doctor_id: int = 1) -> int:
+    """Save a prediction linked to a specific doctor ID."""
     with get_conn() as conn:
         cursor = conn.execute("""
         INSERT INTO predictions (
-            patient_id, age, pathology, t_stage, n_stage, risk_category,
+            doctor_id, patient_id, age, pathology, t_stage, n_stage, risk_category,
             response, physical_examination, recurrence_probability,
             confidence, risk_level, prediction, model_version,
             shap_values_json, input_data_json
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
+            doctor_id or 1,
             prediction_result.get("patientId"),
             int(patient_input.get("Age", 0)),
             patient_input.get("Pathology"),
@@ -89,11 +120,15 @@ def save_prediction(patient_input: dict, prediction_result: dict) -> int:
 
 
 def get_all_predictions(search: str = "", risk_filter: str = "",
-                        page: int = 1, per_page: int = 20) -> dict:
-    """Get paginated predictions with optional search + risk filter"""
+                        page: int = 1, per_page: int = 20, doctor_id: int = None) -> dict:
+    """Get paginated predictions for a specific doctor"""
     offset = (page - 1) * per_page
     conditions = []
     params = []
+
+    if doctor_id:
+        conditions.append("doctor_id = ?")
+        params.append(doctor_id)
 
     if search:
         conditions.append("(patient_id LIKE ? OR pathology LIKE ?)")
@@ -106,13 +141,11 @@ def get_all_predictions(search: str = "", risk_filter: str = "",
     where_clause = f"WHERE {' AND '.join(conditions)}" if conditions else ""
 
     with get_conn() as conn:
-        # Total count
         count_query = f"SELECT COUNT(*) as total FROM predictions {where_clause}"
         total = conn.execute(count_query, params).fetchone()["total"]
 
-        # Paginated results
         query = f"""
-        SELECT id, patient_id, age, pathology, t_stage, n_stage, risk_category,
+        SELECT id, doctor_id, patient_id, age, pathology, t_stage, n_stage, risk_category,
                response, physical_examination, recurrence_probability, confidence,
                risk_level, prediction, model_version, created_at
         FROM predictions
@@ -132,23 +165,31 @@ def get_all_predictions(search: str = "", risk_filter: str = "",
     }
 
 
-def get_patient_timeline(patient_id: str) -> list:
-    """Get all predictions for a specific patient (their timeline)"""
+def get_patient_timeline(patient_id: str, doctor_id: int = None) -> list:
+    """Get predictions for a specific patient under a doctor's workspace"""
+    conditions = ["patient_id = ?"]
+    params = [patient_id]
+
+    if doctor_id:
+        conditions.append("doctor_id = ?")
+        params.append(doctor_id)
+
+    where_clause = "WHERE " + " AND ".join(conditions)
+
     with get_conn() as conn:
-        rows = conn.execute("""
-        SELECT id, patient_id, age, pathology, t_stage, n_stage, risk_category,
+        rows = conn.execute(f"""
+        SELECT id, doctor_id, patient_id, age, pathology, t_stage, n_stage, risk_category,
                response, physical_examination, recurrence_probability, confidence,
                risk_level, prediction, model_version, shap_values_json,
                input_data_json, created_at
         FROM predictions
-        WHERE patient_id = ?
+        {where_clause}
         ORDER BY created_at DESC
-        """, (patient_id,)).fetchall()
+        """, params).fetchall()
 
         results = []
         for row in rows:
             record = dict(row)
-            # Parse JSON fields
             try:
                 record["shap_values"] = json.loads(record.pop("shap_values_json") or "[]")
             except Exception:
@@ -162,32 +203,34 @@ def get_patient_timeline(patient_id: str) -> list:
         return results
 
 
-def get_stats() -> dict:
-    """Aggregate stats for dashboard"""
+def get_stats(doctor_id: int = None) -> dict:
+    """Aggregate stats for a specific doctor's workspace"""
+    where_clause = "WHERE doctor_id = ?" if doctor_id else ""
+    params = [doctor_id] if doctor_id else []
+
     with get_conn() as conn:
-        total = conn.execute("SELECT COUNT(*) as c FROM predictions").fetchone()["c"]
+        total = conn.execute(f"SELECT COUNT(*) as c FROM predictions {where_clause}", params).fetchone()["c"]
 
         by_risk = {"low": 0, "medium": 0, "high": 0}
-        rows = conn.execute("""
-        SELECT LOWER(risk_level) as risk, COUNT(*) as c
-        FROM predictions GROUP BY LOWER(risk_level)
-        """).fetchall()
+        risk_query = f"SELECT LOWER(risk_level) as risk, COUNT(*) as c FROM predictions {where_clause} GROUP BY LOWER(risk_level)"
+        rows = conn.execute(risk_query, params).fetchall()
         for row in rows:
             if row["risk"] in by_risk:
                 by_risk[row["risk"]] = row["c"]
 
-        avg = conn.execute("SELECT AVG(recurrence_probability) as avg FROM predictions").fetchone()
+        avg_query = f"SELECT AVG(recurrence_probability) as avg FROM predictions {where_clause}"
+        avg = conn.execute(avg_query, params).fetchone()
         avg_score = float(avg["avg"]) if avg["avg"] is not None else 0.0
 
-        unique_patients = conn.execute(
-            "SELECT COUNT(DISTINCT patient_id) as c FROM predictions"
-        ).fetchone()["c"]
+        uniq_query = f"SELECT COUNT(DISTINCT patient_id) as c FROM predictions {where_clause}"
+        unique_patients = conn.execute(uniq_query, params).fetchone()["c"]
 
-        # Recent activity - last 7 days
-        recent = conn.execute("""
+        recent_cond = f"{where_clause} AND" if where_clause else "WHERE"
+        recent_query = f"""
         SELECT COUNT(*) as c FROM predictions
-        WHERE datetime(created_at) >= datetime('now', '-7 days', 'localtime')
-        """).fetchone()["c"]
+        {recent_cond} datetime(created_at) >= datetime('now', '-7 days', 'localtime')
+        """
+        recent = conn.execute(recent_query, params).fetchone()["c"]
 
     return {
         "total_predictions": total,
@@ -201,25 +244,27 @@ def get_stats() -> dict:
 
 
 def delete_prediction(prediction_id: int) -> bool:
-    """Delete a specific prediction by ID"""
     with get_conn() as conn:
         cursor = conn.execute("DELETE FROM predictions WHERE id = ?", (prediction_id,))
         return cursor.rowcount > 0
 
 
-def export_all_csv() -> str:
-    """Export all predictions as CSV string"""
+def export_all_csv(doctor_id: int = None) -> str:
     import csv
     import io
 
+    where_clause = "WHERE doctor_id = ?" if doctor_id else ""
+    params = [doctor_id] if doctor_id else []
+
     with get_conn() as conn:
-        rows = conn.execute("""
+        rows = conn.execute(f"""
         SELECT patient_id, age, pathology, t_stage, n_stage, risk_category,
                response, physical_examination, recurrence_probability,
                confidence, risk_level, model_version, created_at
         FROM predictions
+        {where_clause}
         ORDER BY created_at DESC
-        """).fetchall()
+        """, params).fetchall()
 
         output = io.StringIO()
         if rows:

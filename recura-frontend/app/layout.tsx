@@ -33,9 +33,10 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body
-        className={`${inter.variable} ${spaceGrotesk.variable} bg-gray-50 text-gray-900 antialiased`}
-      >
+    <body
+  suppressHydrationWarning
+  className={`${inter.variable} ${spaceGrotesk.variable} bg-gray-50 text-gray-900 antialiased`}
+>
         {children}
       </body>
     </html>

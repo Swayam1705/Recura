@@ -8,8 +8,8 @@ import { Activity, Menu, X, ArrowRight } from "lucide-react";
 const navLinks = [
   { href: "#features", label: "Features" },
   { href: "#how-it-works", label: "How It Works" },
-  { href: "#security", label: "Security" },
-  { href: "#pricing", label: "Pricing" },
+  { href: "#methodology", label: "Methodology" },
+  { href: "#faq", label: "FAQ" },
 ];
 
 export default function Navbar() {
@@ -70,10 +70,16 @@ export default function Navbar() {
             Sign In
           </Link>
           <Link
+            href="/signup"
+            className="px-5 py-2.5 text-sm font-semibold text-blue-700 border border-blue-200 rounded-xl hover:bg-blue-50 transition-all whitespace-nowrap"
+          >
+            Sign Up
+          </Link>
+          <Link
             href="/dashboard"
             className="group relative flex items-center gap-2 px-6 py-3 text-sm font-semibold text-white bg-gradient-to-r from-blue-600 to-blue-700 rounded-xl shadow-lg shadow-blue-500/30 hover:shadow-blue-500/50 hover:scale-105 transition-all whitespace-nowrap"
           >
-            Get Started
+            Launch Dashboard
             <ArrowRight
               size={16}
               className="group-hover:translate-x-1 transition-transform"
@@ -105,20 +111,20 @@ export default function Navbar() {
               {link.label}
             </Link>
           ))}
-          <div className="pt-3 border-t border-gray-200 space-y-3">
-            <Link
-              href="/login"
-              className="block text-gray-600 hover:text-gray-900 transition-colors text-sm font-medium"
-            >
-              Sign In
-            </Link>
-            <Link
-              href="/dashboard"
-              className="block px-4 py-3 text-sm font-semibold bg-gradient-to-r from-blue-600 to-blue-700 rounded-xl text-white text-center shadow-lg shadow-blue-500/30"
-            >
-              Get Started
-            </Link>
-          </div>
+        <div className="hidden lg:flex items-center gap-3 flex-shrink-0">
+          <Link
+            href="/login"
+            className="px-5 py-2.5 text-sm font-semibold text-gray-700 hover:text-gray-900 transition-colors whitespace-nowrap"
+          >
+            Sign In
+          </Link>
+          <Link
+            href="/signup"
+            className="px-6 py-3 text-sm font-semibold text-white bg-gradient-to-r from-blue-600 to-blue-700 rounded-xl shadow-lg shadow-blue-500/30 hover:shadow-blue-500/50 hover:scale-105 transition-all whitespace-nowrap"
+          >
+            Sign Up
+          </Link>
+        </div>
         </motion.div>
       )}
     </motion.nav>

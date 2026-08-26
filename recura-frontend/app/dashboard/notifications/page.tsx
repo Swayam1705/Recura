@@ -5,8 +5,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import {
   Bell, BellRing, CheckCheck, AlertTriangle, AlertCircle,
-  CheckCircle, Loader2, Filter, Trash2, TestTube, Settings, Eye,
-  Clock, Mail, User, TrendingUp
+  CheckCircle, Loader2, Trash2, TestTube, Settings, Eye,
+  Clock, Mail
 } from "lucide-react";
 
 interface Alert {
@@ -29,7 +29,6 @@ interface Counts {
   unread: number;
   unread_high: number;
   unread_medium: number;
-  last_24h: number;
 }
 
 const RISK_STYLES: Record<string, any> = {
@@ -59,6 +58,21 @@ const RISK_STYLES: Record<string, any> = {
   },
 };
 
+// Helper: get logged-in doctor's ID
+function getDoctorId(): string {
+  if (typeof window === "undefined") return "";
+  try {
+    const stored = localStorage.getItem("recura_user");
+    if (stored) {
+      const user = JSON.parse(stored);
+      if (user?.id) return String(user.id);
+    }
+  } catch (e) {
+    console.error(e);
+  }
+  return "";
+}
+
 export default function NotificationsPage() {
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [counts, setCounts] = useState<Counts | null>(null);
@@ -69,9 +83,13 @@ export default function NotificationsPage() {
 
   const fetchData = useCallback(async () => {
     try {
+      const docId = getDoctorId();
+      const docParam = docId ? `&doctor_id=${docId}` : "";
+      const docQuery = docId ? `?doctor_id=${docId}` : "";
+
       const [alertsRes, countsRes] = await Promise.all([
-        fetch(`http://127.0.0.1:8000/alerts?unread_only=${filter === "unread"}&limit=100`),
-        fetch("http://127.0.0.1:8000/alerts/counts"),
+        fetch(`http://127.0.0.1:8000/alerts?unread_only=${filter === "unread"}&limit=100${docParam}`),
+        fetch(`http://127.0.0.1:8000/alerts/counts${docQuery}`),
       ]);
       const alertsData = await alertsRes.json();
       const countsData = await countsRes.json();
@@ -102,7 +120,9 @@ export default function NotificationsPage() {
   const acknowledgeAll = async () => {
     setAckingAll(true);
     try {
-      await fetch("http://127.0.0.1:8000/alerts/acknowledge-all", { method: "POST" });
+      const docId = getDoctorId();
+      const query = docId ? `?doctor_id=${docId}` : "";
+      await fetch(`http://127.0.0.1:8000/alerts/acknowledge-all${query}`, { method: "POST" });
       fetchData();
     } finally {
       setAckingAll(false);
@@ -131,7 +151,6 @@ export default function NotificationsPage() {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
-      {/* Header */}
       <motion.div
         initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}
@@ -152,7 +171,7 @@ export default function NotificationsPage() {
             Clinical Alerts
           </h1>
           <p style={{ color: "#4B5563", marginTop: "0.5rem", fontSize: "1rem" }}>
-            Real-time notifications for high-risk patients
+            Real-time notifications for your high-risk patients.
           </p>
         </div>
 
@@ -201,7 +220,6 @@ export default function NotificationsPage() {
         </div>
       </motion.div>
 
-      {/* Stats Cards */}
       {counts && (
         <div style={{
           display: "grid",
@@ -212,7 +230,7 @@ export default function NotificationsPage() {
             { label: "Total Alerts", value: counts.total, icon: Bell, color: "#3B82F6", bg: "#EFF6FF" },
             { label: "Unread", value: counts.unread, icon: BellRing, color: "#0F766E", bg: "#F0FDFA", pulse: counts.unread > 0 },
             { label: "High Risk (Unread)", value: counts.unread_high, icon: AlertTriangle, color: "#EF4444", bg: "#FEE2E2" },
-            { label: "Last 24 Hours", value: counts.last_24h, icon: Clock, color: "#8B5CF6", bg: "#F5F3FF" },
+            { label: "Medium Risk (Unread)", value: counts.unread_medium, icon: AlertCircle, color: "#F59E0B", bg: "#FEF3C7" },
           ].map((card, i) => {
             const Icon = card.icon;
             return (
@@ -274,7 +292,6 @@ export default function NotificationsPage() {
         </div>
       )}
 
-      {/* Filter tabs + Actions */}
       <div style={{
         display: "flex",
         justifyContent: "space-between",
@@ -351,7 +368,6 @@ export default function NotificationsPage() {
         )}
       </div>
 
-      {/* Alerts List */}
       <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
         {loading ? (
           <div style={{ textAlign: "center", padding: "3rem" }}>
@@ -378,7 +394,7 @@ export default function NotificationsPage() {
             <p style={{ color: "#6B7280", fontSize: "0.85rem", marginBottom: "1.25rem" }}>
               {filter === "unread"
                 ? "You've acknowledged all clinical alerts."
-                : "High-risk predictions will automatically appear here."}
+                : "High-risk predictions in your workspace will appear here automatically."}
             </p>
             <button
               onClick={sendTestAlert}
@@ -418,7 +434,6 @@ export default function NotificationsPage() {
                     position: "relative",
                   }}
                 >
-                  {/* Left accent bar */}
                   <div style={{
                     position: "absolute",
                     left: 0,
@@ -541,7 +556,6 @@ export default function NotificationsPage() {
                           <span style={{ color: "#059669", display: "flex", alignItems: "center", gap: "0.25rem" }}>
                             <CheckCircle size={10} />
                             Acknowledged by {alert.acknowledged_by}
-                            {alert.acknowledged_at && ` · ${new Date(alert.acknowledged_at).toLocaleString()}`}
                           </span>
                         )}
                       </div>

@@ -83,7 +83,8 @@ class PatientData(BaseModel):
     N: str
     Risk: str
     Pathology: str
-    patient_id: str | None = None  # Optional: for follow-up predictions
+    patient_id: str | None = None
+    doctor_id: int | None = 1  # <-- ADD THIS FIELD  # Optional: for follow-up predictions
 
 def clean_value(v):
     if v is None:
@@ -272,40 +273,6 @@ def root():
         "top_features": TOP_FEATURES,
     }
 
-# @app.post("/predict")
-# def predict_recurrence(patient: PatientData):
-#     if MODEL_LOADED and cnn_model is not None and scaler is not None:
-#         try:
-#             full_row = build_full_feature_row(patient)
-#             processed = preprocess_for_cnn(full_row)
-#             raw_prob = float(cnn_model.predict(processed, verbose=0)[0][0])
-
-#             clinical_severity = calculate_clinical_severity(patient)
-#             final_prob, risk_level = get_calibrated_prediction(raw_prob, clinical_severity)
-
-#             print(f"CNN: {raw_prob:.3f} | Clinical: {clinical_severity:.3f} | Blended: {final_prob:.3f} | Risk: {risk_level}")
-
-#         except Exception as e:
-#             print(f"Prediction error: {e}")
-#             final_prob = 0.5
-#             risk_level = "medium"
-#     else:
-#         final_prob = 0.5
-#         risk_level = "medium"
-
-#     final = 1 if final_prob > 0.5 else 0
-#     return {
-#         "patientId": f"PT-{np.random.randint(1000, 9999)}",
-#         "prediction": final,
-#         "recurrenceProbability": final_prob,
-#         "confidence": max(final_prob, 1 - final_prob),
-#         "riskLevel": risk_level,
-#         "status": "High Risk of Recurrence" if final == 1 else "Low Risk of Recurrence",
-#         "shapValues": generate_shap_values(patient, final_prob),
-#         "modelVersion": "Deep 1D-CNN + Clinical Calibration v4.1",
-#         "timestamp": pd.Timestamp.now().isoformat(),
-#     }
-
 @app.post("/predict")
 def predict_recurrence(patient: PatientData):
     if MODEL_LOADED and cnn_model is not None and scaler is not None:
@@ -354,6 +321,35 @@ def predict_recurrence(patient: PatientData):
             risk_level=risk_level,
             risk_score=final_prob,
             pathology=patient.Pathology,
+        )
+        if alert:
+            response_data["alertCreated"] = True
+            response_data["alertId"] = alert["id"]
+    except Exception as e:
+        print(f"Alert creation failed: {e}")
+
+    return response_data
+
+    # Determine doctor_id (defaults to 1 if missing)
+    doctor_id = patient.doctor_id or 1
+
+    # Auto-save to database
+    try:
+        patient_dict = patient.dict(exclude={"patient_id", "doctor_id"})
+        prediction_id = save_prediction(patient_dict, response_data, doctor_id=doctor_id)
+        response_data["dbId"] = prediction_id
+        print(f"Saved prediction #{prediction_id} for Doctor #{doctor_id} ({patient_id})")
+    except Exception as e:
+        print(f"Failed to save prediction: {e}")
+
+    # Auto-trigger alert if risk warrants it
+    try:
+        alert = check_and_create_alert(
+            patient_id=patient_id,
+            risk_level=risk_level,
+            risk_score=final_prob,
+            pathology=patient.Pathology,
+            doctor_id=doctor_id, # <-- PASS DOCTOR ID HERE
         )
         if alert:
             response_data["alertCreated"] = True
@@ -688,42 +684,31 @@ def get_history(
     search: str = "",
     risk: str = "",
     page: int = 1,
-    per_page: int = 20
+    per_page: int = 20,
+    doctor_id: int | None = None # <-- ADD
 ):
-    """Get paginated prediction history with optional search + risk filter"""
     try:
-        return get_all_predictions(search, risk, page, per_page)
+        return get_all_predictions(search, risk, page, per_page, doctor_id=doctor_id)
     except Exception as e:
-        print(f"History error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
-
 
 @app.get("/history/stats")
-def history_stats():
-    """Dashboard aggregate statistics"""
+def history_stats(doctor_id: int | None = None): # <-- ADD
     try:
-        return get_stats()
+        return get_stats(doctor_id=doctor_id)
     except Exception as e:
-        print(f"Stats error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-
 @app.get("/history/patient/{patient_id}")
-def patient_timeline(patient_id: str):
-    """Get all predictions for a specific patient"""
+def patient_timeline(patient_id: str, doctor_id: int | None = None): # <-- ADD
     try:
-        timeline = get_patient_timeline(patient_id)
-        if not timeline:
-            raise HTTPException(status_code=404, detail=f"No history found for patient {patient_id}")
+        timeline = get_patient_timeline(patient_id, doctor_id=doctor_id)
         return {
             "patient_id": patient_id,
             "prediction_count": len(timeline),
             "predictions": timeline,
         }
-    except HTTPException:
-        raise
     except Exception as e:
-        print(f"Timeline error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -824,19 +809,16 @@ class AlertConfig(BaseModel):
 
 
 @app.get("/alerts")
-def list_alerts(unread_only: bool = False, limit: int = 50):
-    """Get all alerts, most recent first"""
+def list_alerts(unread_only: bool = False, limit: int = 50, doctor_id: int | None = None): # <-- ADD
     try:
-        return get_alerts(unread_only=unread_only, limit=limit)
+        return get_alerts(unread_only=unread_only, limit=limit, doctor_id=doctor_id)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-
 @app.get("/alerts/counts")
-def alert_counts():
-    """Get aggregated alert counts (for badge display)"""
+def alert_counts(doctor_id: int | None = None): # <-- ADD
     try:
-        return get_alert_counts()
+        return get_alert_counts(doctor_id=doctor_id)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -856,14 +838,12 @@ def ack_alert(alert_id: int):
 
 
 @app.post("/alerts/acknowledge-all")
-def ack_all_alerts():
-    """Mark all unread alerts as acknowledged"""
+def ack_all_alerts(doctor_id: int | None = None): # <-- ADD
     try:
-        count = acknowledge_all()
+        count = acknowledge_all(doctor_id=doctor_id)
         return {"acknowledged_count": count}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-
 
 @app.delete("/alerts/{alert_id}")
 def remove_alert(alert_id: int):
@@ -910,3 +890,97 @@ def send_test_alert():
         return {"created": False, "message": "Alert threshold not met by config"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+    # ═══════════════════════════════════════════════════════════════════
+#  AUTHENTICATION ENDPOINTS (Sign Up / Sign In)
+# ═══════════════════════════════════════════════════════════════════
+import bcrypt
+import jwt
+from datetime import datetime, timedelta
+
+SECRET_KEY = "recura_super_secret_capstone_key"  # In production, use .env
+
+class DoctorSignUp(BaseModel):
+    name: str
+    email: str
+    hospital: str
+    password: str
+
+class DoctorSignIn(BaseModel):
+    email: str
+    password: str
+
+@app.post("/auth/signup")
+def signup(data: DoctorSignUp):
+    try:
+        from database import get_conn
+        with get_conn() as conn:
+            # Check if email already exists
+            existing = conn.execute("SELECT id FROM doctors WHERE email = ?", (data.email.lower(),)).fetchone()
+            if existing:
+                raise HTTPException(status_code=400, detail="Email already registered")
+
+            # Hash the password securely
+            salt = bcrypt.gensalt()
+            hashed = bcrypt.hashpw(data.password.encode('utf-8'), salt).decode('utf-8')
+
+            # Insert new doctor
+            cursor = conn.execute("""
+            INSERT INTO doctors (name, email, hospital, password_hash)
+            VALUES (?, ?, ?, ?)
+            """, (data.name, data.email.lower(), data.hospital, hashed))
+            
+            doctor_id = cursor.lastrowid
+
+            # Create JWT Token
+            token = jwt.encode({
+                "sub": str(doctor_id),
+                "name": data.name,
+                "hospital": data.hospital,
+                "exp": datetime.utcnow() + timedelta(days=7)
+            }, SECRET_KEY, algorithm="HS256")
+
+            return {
+                "message": "Doctor registered successfully",
+                "token": token,
+                "doctor": {"id": doctor_id, "name": data.name, "hospital": data.hospital}
+            }
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Signup error: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+@app.post("/auth/login")
+def login(data: DoctorSignIn):
+    try:
+        from database import get_conn
+        with get_conn() as conn:
+            # Find doctor by email
+            doctor = conn.execute("SELECT * FROM doctors WHERE email = ?", (data.email.lower(),)).fetchone()
+            
+            if not doctor:
+                raise HTTPException(status_code=401, detail="Invalid email or password")
+
+            # Verify password
+            if not bcrypt.checkpw(data.password.encode('utf-8'), doctor["password_hash"].encode('utf-8')):
+                raise HTTPException(status_code=401, detail="Invalid email or password")
+
+            # Create JWT Token
+            token = jwt.encode({
+                "sub": str(doctor["id"]),
+                "name": doctor["name"],
+                "hospital": doctor["hospital"],
+                "exp": datetime.utcnow() + timedelta(days=7)
+            }, SECRET_KEY, algorithm="HS256")
+
+            return {
+                "message": "Login successful",
+                "token": token,
+                "doctor": {"id": doctor["id"], "name": doctor["name"], "hospital": doctor["hospital"]}
+            }
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Login error: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
