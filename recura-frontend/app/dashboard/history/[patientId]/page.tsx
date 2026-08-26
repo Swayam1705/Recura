@@ -44,7 +44,21 @@ export default function PatientTimelinePage() {
 
   useEffect(() => {
     if (!patientId) return;
-    fetch(`http://127.0.0.1:8000/history/patient/${patientId}`)
+    const docId = (() => {
+      if (typeof window === "undefined") return "";
+      try {
+        const stored = localStorage.getItem("recura_user");
+        if (stored) {
+          const user = JSON.parse(stored);
+          return user?.id ? String(user.id) : "";
+        }
+      } catch (e) {
+        console.error(e);
+      }
+      return "";
+    })();
+    const query = docId ? `?doctor_id=${docId}` : "";
+    fetch(`http://127.0.0.1:8000/history/patient/${patientId}${query}`)
       .then((res) => {
         if (!res.ok) throw new Error("Patient not found");
         return res.json();

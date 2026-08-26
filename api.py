@@ -314,26 +314,10 @@ def predict_recurrence(patient: PatientData):
         "modelVersion": "Deep 1D-CNN + Clinical Calibration v4.1",
         "timestamp": pd.Timestamp.now().isoformat(),
     }
-    # Auto-trigger alert if risk warrants it
-    try:
-        alert = check_and_create_alert(
-            patient_id=patient_id,
-            risk_level=risk_level,
-            risk_score=final_prob,
-            pathology=patient.Pathology,
-        )
-        if alert:
-            response_data["alertCreated"] = True
-            response_data["alertId"] = alert["id"]
-    except Exception as e:
-        print(f"Alert creation failed: {e}")
-
-    return response_data
-
-    # Determine doctor_id (defaults to 1 if missing)
+    # Determine doctor_id from the incoming request (defaults to 1 if missing)
     doctor_id = patient.doctor_id or 1
 
-    # Auto-save to database
+    # Auto-save to database FIRST (before returning)
     try:
         patient_dict = patient.dict(exclude={"patient_id", "doctor_id"})
         prediction_id = save_prediction(patient_dict, response_data, doctor_id=doctor_id)
@@ -342,18 +326,19 @@ def predict_recurrence(patient: PatientData):
     except Exception as e:
         print(f"Failed to save prediction: {e}")
 
-    # Auto-trigger alert if risk warrants it
+    # Auto-trigger alert with correct doctor-level isolation
     try:
         alert = check_and_create_alert(
             patient_id=patient_id,
             risk_level=risk_level,
             risk_score=final_prob,
             pathology=patient.Pathology,
-            doctor_id=doctor_id, # <-- PASS DOCTOR ID HERE
+            doctor_id=doctor_id,
         )
         if alert:
             response_data["alertCreated"] = True
             response_data["alertId"] = alert["id"]
+            print(f"Alert created: #{alert['id']} for Doctor #{doctor_id}")
     except Exception as e:
         print(f"Alert creation failed: {e}")
 
@@ -727,10 +712,10 @@ def delete_prediction_endpoint(prediction_id: int):
 
 
 @app.get("/history/export/csv")
-def export_history_csv():
-    """Download all predictions as CSV"""
+def export_history_csv(doctor_id: int | None = None):
+    """Download predictions as CSV for a specific doctor"""
     try:
-        csv_data = export_all_csv()
+        csv_data = export_all_csv(doctor_id=doctor_id)
         return Response(
             content=csv_data,
             media_type="text/csv",
@@ -742,52 +727,46 @@ def export_history_csv():
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/history/patients/search")
-def search_patients(q: str = ""):
+def search_patients(q: str = "", doctor_id: int | None = None):
     """Search for existing patient IDs (for autocomplete in prediction form)"""
     try:
         from database import get_conn
         with get_conn() as conn:
             query = q.strip().upper()
+            conditions = []
+            params = []
+
+            if doctor_id:
+                conditions.append("p1.doctor_id = ?")
+                params.append(doctor_id)
+
             if query:
-                rows = conn.execute("""
-                SELECT DISTINCT patient_id,
-                       COUNT(*) as prediction_count,
-                       MAX(created_at) as last_visit,
-                       (SELECT risk_level FROM predictions p2 
-                        WHERE p2.patient_id = p1.patient_id 
-                        ORDER BY created_at DESC LIMIT 1) as last_risk,
-                       (SELECT pathology FROM predictions p2 
-                        WHERE p2.patient_id = p1.patient_id 
-                        ORDER BY created_at DESC LIMIT 1) as pathology,
-                       (SELECT age FROM predictions p2 
-                        WHERE p2.patient_id = p1.patient_id 
-                        ORDER BY created_at DESC LIMIT 1) as age
-                FROM predictions p1
-                WHERE patient_id LIKE ?
-                GROUP BY patient_id
-                ORDER BY last_visit DESC
-                LIMIT 10
-                """, (f"%{query}%",)).fetchall()
-            else:
-                # Return recent patients if no query
-                rows = conn.execute("""
-                SELECT DISTINCT patient_id,
-                       COUNT(*) as prediction_count,
-                       MAX(created_at) as last_visit,
-                       (SELECT risk_level FROM predictions p2 
-                        WHERE p2.patient_id = p1.patient_id 
-                        ORDER BY created_at DESC LIMIT 1) as last_risk,
-                       (SELECT pathology FROM predictions p2 
-                        WHERE p2.patient_id = p1.patient_id 
-                        ORDER BY created_at DESC LIMIT 1) as pathology,
-                       (SELECT age FROM predictions p2 
-                        WHERE p2.patient_id = p1.patient_id 
-                        ORDER BY created_at DESC LIMIT 1) as age
-                FROM predictions p1
-                GROUP BY patient_id
-                ORDER BY last_visit DESC
-                LIMIT 10
-                """).fetchall()
+                conditions.append("p1.patient_id LIKE ?")
+                params.extend([f"%{query}%"])
+
+            where_clause = ("WHERE " + " AND ".join(conditions)) if conditions else ""
+
+            sql = f"""
+            SELECT DISTINCT p1.patient_id,
+                   COUNT(*) as prediction_count,
+                   MAX(p1.created_at) as last_visit,
+                   (SELECT p2.risk_level FROM predictions p2
+                    WHERE p2.patient_id = p1.patient_id AND p2.doctor_id = p1.doctor_id
+                    ORDER BY p2.created_at DESC LIMIT 1) as last_risk,
+                   (SELECT p2.pathology FROM predictions p2
+                    WHERE p2.patient_id = p1.patient_id AND p2.doctor_id = p1.doctor_id
+                    ORDER BY p2.created_at DESC LIMIT 1) as pathology,
+                   (SELECT p2.age FROM predictions p2
+                    WHERE p2.patient_id = p1.patient_id AND p2.doctor_id = p1.doctor_id
+                    ORDER BY p2.created_at DESC LIMIT 1) as age
+            FROM predictions p1
+            {where_clause}
+            GROUP BY p1.patient_id
+            ORDER BY last_visit DESC
+            LIMIT 10
+            """
+
+            rows = conn.execute(sql, params).fetchall()
 
             return [dict(row) for row in rows]
     except Exception as e:
