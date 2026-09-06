@@ -38,7 +38,7 @@ export default function DashboardPreview() {
 
   return (
     <div style={{ position: "relative", width: "100%", height: "600px" }}>
-      {/* Central glowing orb */}
+      {/* Central glowing orb container */}
       <div style={{
         position: "absolute",
         top: "50%",
@@ -105,33 +105,38 @@ export default function DashboardPreview() {
           }}
         />
 
-        {/* Central brain icon with glow */}
-        <motion.div
-          animate={{
-            scale: [1, 1.1, 1],
-            boxShadow: [
-              "0 0 40px rgba(59, 130, 246, 0.5)",
-              "0 0 80px rgba(59, 130, 246, 0.8)",
-              "0 0 40px rgba(59, 130, 246, 0.5)",
-            ],
-          }}
-          transition={{ duration: 3, repeat: Infinity }}
-          style={{
-            position: "absolute",
-            top: "50%",
-            left: "50%",
-            transform: "translate(-50%, -50%)",
-            width: "120px",
-            height: "120px",
-            borderRadius: "50%",
-            background: "linear-gradient(135deg, #3B82F6, #1D4ED8)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-          }}
-        >
-          <Brain size={56} color="white" strokeWidth={1.5} />
-        </motion.div>
+        {/* Central brain icon wrapper - Flex centered so Framer scale animation won't uncenter it */}
+        <div style={{
+          position: "absolute",
+          inset: 0,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          zIndex: 10,
+        }}>
+          <motion.div
+            animate={{
+              scale: [1, 1.1, 1],
+              boxShadow: [
+                "0 0 40px rgba(59, 130, 246, 0.5)",
+                "0 0 80px rgba(59, 130, 246, 0.8)",
+                "0 0 40px rgba(59, 130, 246, 0.5)",
+              ],
+            }}
+            transition={{ duration: 3, repeat: Infinity }}
+            style={{
+              width: "120px",
+              height: "120px",
+              borderRadius: "50%",
+              background: "linear-gradient(135deg, #3B82F6, #1D4ED8)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <Brain size={56} color="white" strokeWidth={1.5} />
+          </motion.div>
+        </div>
 
         {/* Data particles orbiting */}
         {[
@@ -415,7 +420,7 @@ export default function DashboardPreview() {
         ))}
       </svg>
 
-      {/* Small floating particles - client-only rendering */}
+      {/* Small floating particles */}
       {particles.map((p, i) => (
         <motion.div
           key={i}

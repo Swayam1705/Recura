@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
@@ -14,12 +14,17 @@ import {
   HelpCircle,
   BarChart3,
   History,
+  HeartPulse,
+  Inbox,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+
+import { useLiveAlertCount } from "../../hooks/useLiveAlertCount";
 
 const navItems = [
   { href: "/dashboard", icon: LayoutDashboard, label: "Overview" },
   { href: "/dashboard/predict", icon: Brain, label: "New Prediction" },
+  { href: "/dashboard/inbox", icon: Inbox, label: "Patient Inbox" },
   { href: "/dashboard/batch", icon: Upload, label: "Batch Upload" },
   { href: "/dashboard/analytics", icon: BarChart3, label: "Model Analytics" },
   { href: "/dashboard/history", icon: History, label: "Patient History" },
@@ -30,7 +35,6 @@ interface SidebarProps {
   setIsOpen: (open: boolean) => void;
 }
 
-// Helper: get logged-in doctor's ID
 function getDoctorId(): string {
   if (typeof window === "undefined") return "";
   try {
@@ -48,13 +52,16 @@ function getDoctorId(): string {
 export default function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
   const pathname = usePathname();
   const width = isOpen ? 280 : 88;
-  const [unreadCount, setUnreadCount] = useState(0);
+  const [mounted, setMounted] = useState(false);
   const [doctorName, setDoctorName] = useState("Doctor");
   const [doctorInitials, setDoctorInitials] = useState("DR");
   const [hospital, setHospital] = useState("");
 
-  // Load logged-in doctor from localStorage
+  const doctorId = getDoctorId() || "1";
+  const unreadCount = useLiveAlertCount(doctorId);
+
   useEffect(() => {
+    setMounted(true);
     const storedUser = localStorage.getItem("recura_user");
     if (storedUser) {
       try {
@@ -65,9 +72,7 @@ export default function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
         const cleanName = (user.name || "Doctor").replace(/^Dr\.\s*/i, "").trim();
         const nameParts = cleanName.split(" ").filter(Boolean);
         if (nameParts.length >= 2) {
-          setDoctorInitials(
-            (nameParts[0][0] + nameParts[1][0]).toUpperCase()
-          );
+          setDoctorInitials((nameParts[0][0] + nameParts[1][0]).toUpperCase());
         } else {
           setDoctorInitials(cleanName.substring(0, 2).toUpperCase());
         }
@@ -75,24 +80,6 @@ export default function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
         console.error("Failed to parse user:", e);
       }
     }
-  }, []);
-
-  // Poll unread notifications every 15s, filtered by doctor_id
-  useEffect(() => {
-    const fetchCount = async () => {
-      try {
-        const docId = getDoctorId();
-        const query = docId ? `?doctor_id=${docId}` : "";
-        const res = await fetch(`http://127.0.0.1:8000/alerts/counts${query}`);
-        const data = await res.json();
-        setUnreadCount(data.unread || 0);
-      } catch {
-        // Silent fail if backend is down
-      }
-    };
-    fetchCount();
-    const interval = setInterval(fetchCount, 15000);
-    return () => clearInterval(interval);
   }, []);
 
   const handleSignOut = () => {
@@ -106,7 +93,7 @@ export default function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
       href: "/dashboard/notifications",
       icon: Bell,
       label: "Notifications",
-      badge: unreadCount,
+      badge: mounted ? unreadCount : 0,
     },
     { href: "/dashboard/help", icon: HelpCircle, label: "Help & Support" },
     { href: "/dashboard/settings", icon: Settings, label: "Settings" },
@@ -130,6 +117,7 @@ export default function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
         boxShadow: "0 4px 20px rgba(0, 0, 0, 0.04)",
       }}
     >
+      {/* Header */}
       <div
         style={{
           display: "flex",
@@ -247,25 +235,14 @@ export default function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
               alignItems: "center",
               justifyContent: "center",
             }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = "#F3F4F6";
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = "transparent";
-            }}
           >
             <ChevronLeft size={18} />
           </button>
         )}
       </div>
 
-      <div
-        style={{
-          padding: "1rem",
-          borderBottom: "1px solid #F3F4F6",
-          flexShrink: 0,
-        }}
-      >
+      {/* Doctor Profile Header */}
+      <div style={{ padding: "1rem", borderBottom: "1px solid #F3F4F6", flexShrink: 0 }}>
         {isOpen ? (
           <div
             style={{
@@ -291,43 +268,16 @@ export default function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
                 fontSize: "0.875rem",
                 fontWeight: "700",
                 flexShrink: 0,
-                boxShadow: "0 4px 12px rgba(59, 130, 246, 0.4)",
               }}
             >
               {doctorInitials}
             </div>
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div
-                style={{
-                  color: "#111827",
-                  fontWeight: "700",
-                  fontSize: "0.875rem",
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
-                  whiteSpace: "nowrap",
-                }}
-              >
+              <div style={{ color: "#111827", fontWeight: "700", fontSize: "0.875rem" }}>
                 {doctorName}
               </div>
-              <div
-                style={{
-                  color: "#6B7280",
-                  fontSize: "0.75rem",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "4px",
-                }}
-              >
-                <span
-                  style={{
-                    width: "6px",
-                    height: "6px",
-                    borderRadius: "50%",
-                    backgroundColor: "#10B981",
-                    flexShrink: 0,
-                  }}
-                />
-                {hospital || "Online"}
+              <div style={{ color: "#6B7280", fontSize: "0.75rem" }}>
+                {hospital || "Online Workspace"}
               </div>
             </div>
           </div>
@@ -345,27 +295,14 @@ export default function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
               fontSize: "0.875rem",
               fontWeight: "700",
               margin: "0 auto",
-              position: "relative",
-              boxShadow: "0 4px 12px rgba(59, 130, 246, 0.4)",
             }}
           >
             {doctorInitials}
-            <div
-              style={{
-                position: "absolute",
-                bottom: "-2px",
-                right: "-2px",
-                width: "14px",
-                height: "14px",
-                borderRadius: "50%",
-                backgroundColor: "#10B981",
-                border: "2px solid white",
-              }}
-            />
           </div>
         )}
       </div>
 
+      {/* Nav Menu */}
       <nav style={{ flex: 1, padding: "0.75rem", overflow: "auto" }}>
         {isOpen && (
           <div
@@ -383,7 +320,7 @@ export default function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
         )}
 
         {navItems.map(({ href, icon: Icon, label }) => {
-          const isActive = pathname === href;
+          const isActive = mounted && pathname === href;
           return (
             <Link
               key={href}
@@ -403,18 +340,6 @@ export default function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
                 transition: "all 0.2s",
                 justifyContent: isOpen ? "flex-start" : "center",
               }}
-              onMouseEnter={(e) => {
-                if (!isActive) {
-                  e.currentTarget.style.backgroundColor = "#F9FAFB";
-                  e.currentTarget.style.color = "#111827";
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (!isActive) {
-                  e.currentTarget.style.backgroundColor = "transparent";
-                  e.currentTarget.style.color = "#4B5563";
-                }
-              }}
             >
               {isActive && (
                 <div
@@ -430,16 +355,8 @@ export default function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
                   }}
                 />
               )}
-              <Icon
-                size={20}
-                strokeWidth={isActive ? 2.5 : 2}
-                style={{ flexShrink: 0 }}
-              />
-              {isOpen && (
-                <span style={{ fontSize: "0.875rem", whiteSpace: "nowrap" }}>
-                  {label}
-                </span>
-              )}
+              <Icon size={20} strokeWidth={isActive ? 2.5 : 2} style={{ flexShrink: 0 }} />
+              {isOpen && <span style={{ fontSize: "0.875rem", whiteSpace: "nowrap" }}>{label}</span>}
             </Link>
           );
         })}
@@ -460,7 +377,7 @@ export default function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
         )}
 
         {bottomItems.map(({ href, icon: Icon, label, badge }) => {
-          const isActive = pathname === href;
+          const isActive = mounted && pathname === href;
           const hasBadge = badge !== undefined && badge > 0;
           return (
             <Link
@@ -479,13 +396,6 @@ export default function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
                 fontWeight: isActive ? "600" : "500",
                 justifyContent: isOpen ? "flex-start" : "center",
                 position: "relative",
-              }}
-              onMouseEnter={(e) => {
-                if (!isActive) e.currentTarget.style.backgroundColor = "#F9FAFB";
-              }}
-              onMouseLeave={(e) => {
-                if (!isActive)
-                  e.currentTarget.style.backgroundColor = "transparent";
               }}
             >
               <div style={{ position: "relative", flexShrink: 0 }}>
@@ -507,8 +417,6 @@ export default function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
-                      border: "2px solid white",
-                      animation: "pulse 2s infinite",
                     }}
                   >
                     {badge > 99 ? "99+" : badge}
@@ -527,7 +435,6 @@ export default function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
                         fontWeight: "700",
                         padding: "2px 8px",
                         borderRadius: "9999px",
-                        animation: "pulse 2s infinite",
                       }}
                     >
                       {badge > 99 ? "99+" : badge}
@@ -540,38 +447,8 @@ export default function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
         })}
       </nav>
 
-      <div
-        style={{
-          padding: "0.75rem",
-          borderTop: "1px solid #F3F4F6",
-          flexShrink: 0,
-        }}
-      >
-        {!isOpen && (
-          <button
-            onClick={() => setIsOpen(true)}
-            style={{
-              width: "100%",
-              padding: "8px",
-              borderRadius: "8px",
-              background: "transparent",
-              border: "none",
-              cursor: "pointer",
-              color: "#6B7280",
-              display: "flex",
-              justifyContent: "center",
-              marginBottom: "8px",
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = "#F3F4F6";
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = "transparent";
-            }}
-          >
-            <ChevronLeft size={18} style={{ transform: "rotate(180deg)" }} />
-          </button>
-        )}
+      {/* Footer */}
+      <div style={{ padding: "0.75rem", borderTop: "1px solid #F3F4F6", flexShrink: 0 }}>
         <button
           onClick={handleSignOut}
           style={{
@@ -589,31 +466,11 @@ export default function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
             fontWeight: "600",
             justifyContent: isOpen ? "flex-start" : "center",
           }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.backgroundColor = "#FEF2F2";
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.backgroundColor = "transparent";
-          }}
         >
           <LogOut size={20} strokeWidth={2} />
           {isOpen && "Sign Out"}
         </button>
       </div>
-
-      <style jsx>{`
-        @keyframes pulse {
-          0%,
-          100% {
-            opacity: 1;
-            transform: scale(1);
-          }
-          50% {
-            opacity: 0.7;
-            transform: scale(1.1);
-          }
-        }
-      `}</style>
     </motion.aside>
   );
 }

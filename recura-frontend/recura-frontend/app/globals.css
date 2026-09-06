@@ -1,0 +1,35 @@
+﻿@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ────────────────────────────────────────────────────────
+   PRINT / PDF GENERATION STYLES
+   ──────────────────────────────────────────────────────── */
+@media print {
+  body * {
+    visibility: hidden !important;
+  }
+  
+  #printable-pdf-area,
+  #printable-pdf-area * {
+    visibility: visible !important;
+  }
+
+  #printable-pdf-area {
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 100% !important;
+    display: block !important;
+    background: white !important;
+    color: #0F172A !important;
+    padding: 24px !important;
+    margin: 0 !important;
+    box-shadow: none !important;
+    border: none !important;
+  }
+
+  .no-print, aside, nav, header, footer, button {
+    display: none !important;
+  }
+}

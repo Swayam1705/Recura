@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { motion } from "framer-motion";
 import Link from "next/link";
@@ -86,7 +86,7 @@ export default function Hero() {
         />
       </div>
 
-      {/* ===== NAVBAR (inside Hero) ===== */}
+      {/* ===== NAVBAR ===== */}
       <nav style={{
         position: "absolute",
         top: 0,
@@ -195,36 +195,44 @@ export default function Hero() {
             ))}
           </div>
 
-          {/* Right actions: Sign In · Sign Up only */}
+          {/* Right actions: Patient vs Doctor (separate portals) */}
           <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }} className="hidden lg:flex">
             <Link
-              href="/login"
-              style={{
-                padding: "0.625rem 1.25rem",
-                fontSize: "0.875rem",
-                fontWeight: "600",
-                color: "rgba(255, 255, 255, 0.9)",
-                textDecoration: "none",
-                borderRadius: "0.75rem",
-                transition: "all 0.2s",
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.08)";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = "transparent";
-              }}
-            >
-              Sign In
-            </Link>
-
-            <Link
-              href="/signup"
+              href="/patient/login"
               style={{
                 display: "flex",
                 alignItems: "center",
                 gap: "0.4rem",
-                padding: "0.75rem 1.35rem",
+                padding: "0.625rem 1.25rem",
+                fontSize: "0.875rem",
+                fontWeight: "600",
+                color: "#93C5FD",
+                border: "1px solid rgba(147, 197, 253, 0.35)",
+                backgroundColor: "rgba(15, 23, 42, 0.45)",
+                textDecoration: "none",
+                borderRadius: "0.75rem",
+                transition: "all 0.2s",
+                whiteSpace: "nowrap",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = "rgba(59, 130, 246, 0.2)";
+                e.currentTarget.style.borderColor = "rgba(147, 197, 253, 0.6)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = "rgba(15, 23, 42, 0.45)";
+                e.currentTarget.style.borderColor = "rgba(147, 197, 253, 0.35)";
+              }}
+            >
+              â¤ï¸ Patient Self-Check
+            </Link>
+
+            <Link
+              href="/login"
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "0.4rem",
+                padding: "0.625rem 1.25rem",
                 fontSize: "0.875rem",
                 fontWeight: "700",
                 color: "white",
@@ -242,7 +250,7 @@ export default function Hero() {
                 e.currentTarget.style.transform = "scale(1)";
               }}
             >
-              Sign Up
+              ðŸ©º Doctor Sign In
             </Link>
           </div>
         </div>
@@ -362,7 +370,7 @@ export default function Hero() {
             >
               Research-grade{" "}
               <span style={{ color: "white", fontWeight: "500" }}>explainable AI</span> for
-              clinical decision support — with SHAP transparency, note parsing, patient history,
+              clinical decision support â€” with SHAP transparency, note parsing, patient history,
               and high-risk alerts.
             </motion.p>
 
@@ -395,7 +403,6 @@ export default function Hero() {
               ))}
             </motion.div>
 
-            {/* CTAs moved to navbar. Stats immediately below description. */}
             <motion.div
               initial={{ opacity: 0, y: 30 }}
               animate={{ opacity: 1, y: 0 }}
