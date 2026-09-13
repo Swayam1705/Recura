@@ -1,406 +1,325 @@
-"use client";
+﻿"use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
+import { useParams, useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import Link from "next/link";
-import { useParams } from "next/navigation";
 import {
-  ArrowLeft, Calendar, TrendingUp, TrendingDown, Activity,
-  AlertTriangle, CheckCircle, AlertCircle, Loader2, User,
-  FileText, Clock
+  ArrowLeft, Calendar, User, Activity, AlertTriangle, CheckCircle,
+  Brain, Clock, FileText, Stethoscope, Loader2, Database, ShieldAlert
 } from "lucide-react";
 
-interface TimelinePrediction {
-  id: number;
+interface RecordItem {
+  id: number | string;
   patient_id: string;
-  age: number;
-  pathology: string;
-  t_stage: string;
-  n_stage: string;
-  risk_category: string;
-  response: string;
-  physical_examination: string;
-  recurrence_probability: number;
-  confidence: number;
-  risk_level: string;
-  model_version: string;
+  age?: number;
+  pathology?: string;
+  t_stage?: string;
+  n_stage?: string;
+  risk_category?: string;
+  response?: string;
+  physical_examination?: string;
+  recurrence_probability?: number;
+  confidence?: number;
+  risk_level?: string;
+  model_version?: string;
+  shap_values?: Array<{ feature: string; value: any; impact: number; direction: string }>;
+  input_data?: any;
+  doctor_note?: string;
+  doctor_action?: string;
+  appointment_time?: string;
   created_at: string;
-  shap_values: any[];
-  input_data: any;
+  record_type?: string;
 }
 
-const RISK_STYLES: Record<string, any> = {
-  low: { bg: "#D1FAE5", text: "#065F46", border: "#A7F3D0", icon: CheckCircle, bar: "#10B981" },
-  medium: { bg: "#FEF3C7", text: "#92400E", border: "#FCD34D", icon: AlertCircle, bar: "#F59E0B" },
-  high: { bg: "#FEE2E2", text: "#991B1B", border: "#FECACA", icon: AlertTriangle, bar: "#EF4444" },
+const RISK_STYLES: Record<string, { bg: string; text: string; border: string; dot: string }> = {
+  low: { bg: "#D1FAE5", text: "#065F46", border: "#A7F3D0", dot: "#10B981" },
+  medium: { bg: "#FEF3C7", text: "#92400E", border: "#FCD34D", dot: "#F59E0B" },
+  high: { bg: "#FEE2E2", text: "#991B1B", border: "#FECACA", dot: "#EF4444" },
 };
+
+function getDoctorId(): string {
+  if (typeof window === "undefined") return "";
+  try {
+    const stored = localStorage.getItem("recura_user");
+    if (stored) {
+      const user = JSON.parse(stored);
+      if (user?.id) return String(user.id);
+    }
+  } catch (e) {
+    console.error(e);
+  }
+  return "";
+}
 
 export default function PatientTimelinePage() {
   const params = useParams();
-  const patientId = params?.patientId as string;
-  const [timeline, setTimeline] = useState<TimelinePrediction[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const router = useRouter();
+  const rawPatientId = params?.patientId as string;
+  const patientId = rawPatientId ? decodeURIComponent(rawPatientId) : "";
 
-  useEffect(() => {
+  const [records, setRecords] = useState<RecordItem[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const fetchTimeline = useCallback(async () => {
     if (!patientId) return;
-    fetch(`http://127.0.0.1:8000/history/patient/${patientId}`)
-      .then((res) => {
-        if (!res.ok) throw new Error("Patient not found");
-        return res.json();
-      })
-      .then((data) => {
-        setTimeline(data.predictions || []);
-      })
-      .catch((err) => setError(err.message))
-      .finally(() => setLoading(false));
+    setLoading(true);
+    try {
+      const docId = getDoctorId();
+      const query = docId ? `?doctor_id=${docId}` : "";
+      
+      const res = await fetch(`http://127.0.0.1:8000/history/patient/${encodeURIComponent(patientId)}${query}`);
+      if (res.ok) {
+        const data = await res.json();
+        const list = Array.isArray(data) ? data : (data.predictions || data.timeline || []);
+        setRecords(list);
+      } else {
+        setRecords([]);
+      }
+    } catch (err) {
+      console.error("Failed to load patient timeline:", err);
+      setRecords([]);
+    } finally {
+      setLoading(false);
+    }
   }, [patientId]);
 
-  if (loading) {
-    return (
-      <div style={{ display: "flex", justifyContent: "center", padding: "4rem" }}>
-        <Loader2 size={32} className="animate-spin" color="#0F766E" />
-      </div>
-    );
-  }
+  useEffect(() => {
+    fetchTimeline();
+  }, [fetchTimeline]);
 
-  if (error || timeline.length === 0) {
-    return (
-      <div style={{ padding: "3rem", textAlign: "center", background: "white", borderRadius: "12px", border: "1px solid #E5E7EB" }}>
-        <AlertCircle size={40} color="#EF4444" style={{ margin: "0 auto 1rem" }} />
-        <h2 style={{ color: "#111827", fontFamily: "var(--font-space)", fontWeight: 700, marginBottom: "0.5rem" }}>
-          Patient Not Found
-        </h2>
-        <p style={{ color: "#6B7280", marginBottom: "1.5rem" }}>{error || "No predictions found for this patient."}</p>
-        <Link href="/dashboard/history" style={{
-          display: "inline-flex",
-          alignItems: "center",
-          gap: "0.5rem",
-          padding: "0.625rem 1rem",
-          background: "#0F766E",
-          color: "white",
-          textDecoration: "none",
-          borderRadius: "8px",
-          fontSize: "0.85rem",
-          fontWeight: 600,
-        }}>
-          <ArrowLeft size={14} />
-          Back to History
-        </Link>
-      </div>
-    );
-  }
-
-  const latest = timeline[0];
-  const oldest = timeline[timeline.length - 1];
-  const trend = latest.recurrence_probability - oldest.recurrence_probability;
-  const isImproving = trend < 0;
-  const latestStyle = RISK_STYLES[latest.risk_level.toLowerCase()] || RISK_STYLES.low;
-  const LatestIcon = latestStyle.icon;
+  const latestRecord = records[0];
+  const patientAge = latestRecord?.age || "N/A";
+  const patientPathology = latestRecord?.pathology || "Thyroid Evaluation";
+  const latestRisk = (latestRecord?.risk_level || "low").toLowerCase();
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
-      {/* Back link */}
-      <Link href="/dashboard/history" style={{
-        display: "inline-flex",
-        alignItems: "center",
-        gap: "0.375rem",
-        color: "#6B7280",
-        textDecoration: "none",
-        fontSize: "0.85rem",
-        fontWeight: 500,
-        width: "fit-content",
-      }}>
-        <ArrowLeft size={14} />
-        Back to Patient History
-      </Link>
-
-      {/* Header */}
+    <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem", maxWidth: "1000px", margin: "0 auto" }}>
+      {/* Top Header & Navigation */}
       <motion.div
         initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}
-        style={{
-          background: "white",
-          padding: "1.5rem",
-          borderRadius: "1rem",
-          border: "1px solid #E5E7EB",
-          boxShadow: "0 1px 3px rgba(0,0,0,0.05)",
-        }}
+        style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "1rem" }}
       >
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "1rem" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
-            <div style={{
-              width: "56px",
-              height: "56px",
-              borderRadius: "14px",
-              background: "linear-gradient(135deg, #EFF6FF, #DBEAFE)",
-              display: "flex",
+        <div>
+          <button
+            onClick={() => router.back()}
+            style={{
+              display: "inline-flex",
               alignItems: "center",
-              justifyContent: "center",
-            }}>
-              <User size={28} color="#2563EB" />
-            </div>
-            <div>
-              <h1 style={{
-                fontFamily: "var(--font-space)",
-                fontSize: "1.75rem",
-                fontWeight: 700,
-                color: "#111827",
-                letterSpacing: "-0.02em",
-              }}>
-                {patientId}
-              </h1>
-              <p style={{ color: "#6B7280", fontSize: "0.85rem", marginTop: "0.25rem" }}>
-                {latest.age} years old · {latest.pathology} · {latest.t_stage}/{latest.n_stage}
-              </p>
-            </div>
-          </div>
-
-          <div style={{ display: "flex", gap: "0.75rem", alignItems: "center" }}>
-            <div style={{
-              padding: "0.75rem 1rem",
-              background: "#F9FAFB",
-              borderRadius: "10px",
-              textAlign: "center",
-            }}>
-              <p style={{ fontSize: "0.65rem", color: "#6B7280", fontWeight: 600, textTransform: "uppercase", marginBottom: "2px" }}>
-                Total Predictions
-              </p>
-              <p style={{ fontFamily: "var(--font-space)", fontSize: "1.5rem", fontWeight: 700, color: "#111827", lineHeight: 1 }}>
-                {timeline.length}
-              </p>
-            </div>
-            {timeline.length > 1 && (
-              <div style={{
-                padding: "0.75rem 1rem",
-                background: isImproving ? "#D1FAE5" : "#FEE2E2",
-                borderRadius: "10px",
-                textAlign: "center",
-                border: `1px solid ${isImproving ? "#A7F3D0" : "#FECACA"}`,
-              }}>
-                <p style={{ fontSize: "0.65rem", color: isImproving ? "#065F46" : "#991B1B", fontWeight: 600, textTransform: "uppercase", marginBottom: "2px" }}>
-                  Risk Trend
-                </p>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "0.25rem" }}>
-                  {isImproving ? <TrendingDown size={16} color="#059669" /> : <TrendingUp size={16} color="#DC2626" />}
-                  <span style={{
-                    fontFamily: "var(--font-space)",
-                    fontSize: "1.1rem",
-                    fontWeight: 700,
-                    color: isImproving ? "#059669" : "#DC2626",
-                  }}>
-                    {isImproving ? "" : "+"}{(trend * 100).toFixed(1)}%
-                  </span>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      </motion.div>
-
-      {/* Latest Assessment Card */}
-      <motion.div
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        style={{
-          padding: "1.5rem",
-          borderRadius: "1rem",
-          border: `2px solid ${latestStyle.border}`,
-          background: latestStyle.bg,
-          boxShadow: `0 4px 20px ${latestStyle.bar}20`,
-        }}
-      >
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "1rem" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "0.875rem" }}>
-            <div style={{
-              width: "48px",
-              height: "48px",
-              borderRadius: "12px",
+              gap: "0.4rem",
+              padding: "0.4rem 0.8rem",
               background: "white",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-            }}>
-              <LatestIcon size={24} color={latestStyle.text} />
-            </div>
-            <div>
-              <p style={{ fontSize: "0.75rem", color: latestStyle.text, fontWeight: 600, textTransform: "uppercase", marginBottom: "2px" }}>
-                Latest Assessment
-              </p>
-              <h3 style={{
-                fontFamily: "var(--font-space)",
-                fontSize: "1.375rem",
-                fontWeight: 700,
-                color: latestStyle.text,
-              }}>
-                {latest.risk_level.toUpperCase()} RISK
-              </h3>
-              <p style={{ color: latestStyle.text, opacity: 0.8, fontSize: "0.8rem", marginTop: "2px", display: "flex", alignItems: "center", gap: "0.375rem" }}>
-                <Clock size={11} />
-                {new Date(latest.created_at).toLocaleString()}
-              </p>
-            </div>
-          </div>
-          <div style={{ textAlign: "right" }}>
-            <p style={{
-              fontFamily: "var(--font-space)",
-              fontSize: "2.5rem",
-              fontWeight: 700,
-              color: latestStyle.text,
-              lineHeight: 1,
-            }}>
-              {(latest.recurrence_probability * 100).toFixed(1)}%
-            </p>
-            <p style={{ fontSize: "0.75rem", color: latestStyle.text, opacity: 0.8, marginTop: "0.375rem" }}>
-              Recurrence Probability
-            </p>
-          </div>
+              border: "1px solid #E5E7EB",
+              borderRadius: "8px",
+              fontSize: "0.85rem",
+              fontWeight: 600,
+              color: "#4B5563",
+              cursor: "pointer",
+              marginBottom: "0.75rem",
+            }}
+          >
+            <ArrowLeft size={16} /> Back
+          </button>
+          <h1 style={{
+            fontFamily: "var(--font-space)",
+            fontSize: "clamp(1.75rem, 3vw, 2.25rem)",
+            fontWeight: 700,
+            color: "#111827",
+            letterSpacing: "-0.02em",
+            display: "flex",
+            alignItems: "center",
+            gap: "0.75rem"
+          }}>
+            <User size={28} color="#0F766E" />
+            Patient History Timeline: <span style={{ fontFamily: "monospace", color: "#0F766E" }}>{patientId}</span>
+          </h1>
         </div>
+
+        {latestRecord && (
+          <span style={{
+            padding: "0.4rem 1rem",
+            background: (RISK_STYLES[latestRisk] || RISK_STYLES.low).bg,
+            color: (RISK_STYLES[latestRisk] || RISK_STYLES.low).text,
+            border: `1px solid ${(RISK_STYLES[latestRisk] || RISK_STYLES.low).border}`,
+            borderRadius: "9999px",
+            fontSize: "0.85rem",
+            fontWeight: 700,
+            textTransform: "uppercase",
+            display: "inline-flex",
+            alignItems: "center",
+            gap: "0.5rem"
+          }}>
+            <span style={{ width: "8px", height: "8px", borderRadius: "50%", background: (RISK_STYLES[latestRisk] || RISK_STYLES.low).dot }} />
+            Latest Status: {latestRisk} Risk
+          </span>
+        )}
       </motion.div>
 
-      {/* Timeline */}
-      <div>
-        <h2 style={{
-          fontFamily: "var(--font-space)",
-          fontSize: "1.125rem",
-          fontWeight: 700,
-          color: "#111827",
-          marginBottom: "1rem",
-          display: "flex",
-          alignItems: "center",
-          gap: "0.5rem",
-        }}>
-          <Activity size={18} color="#0F766E" />
-          Prediction Timeline ({timeline.length})
+      {/* Patient Summary Header Card */}
+      <div style={{
+        background: "white",
+        borderRadius: "14px",
+        border: "1px solid #E5E7EB",
+        padding: "1.25rem 1.5rem",
+        display: "grid",
+        gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+        gap: "1rem",
+        boxShadow: "0 1px 3px rgba(0,0,0,0.05)"
+      }}>
+        <div>
+          <div style={{ fontSize: "0.75rem", color: "#6B7280", fontWeight: 600 }}>Patient ID</div>
+          <div style={{ fontSize: "1.1rem", fontWeight: 700, fontFamily: "monospace", color: "#111827" }}>{patientId}</div>
+        </div>
+        <div>
+          <div style={{ fontSize: "0.75rem", color: "#6B7280", fontWeight: 600 }}>Age</div>
+          <div style={{ fontSize: "1.1rem", fontWeight: 700, color: "#111827" }}>{patientAge} yrs</div>
+        </div>
+        <div>
+          <div style={{ fontSize: "0.75rem", color: "#6B7280", fontWeight: 600 }}>Pathology Variant</div>
+          <div style={{ fontSize: "1.1rem", fontWeight: 700, color: "#111827" }}>{patientPathology}</div>
+        </div>
+        <div>
+          <div style={{ fontSize: "0.75rem", color: "#6B7280", fontWeight: 600 }}>Total Records</div>
+          <div style={{ fontSize: "1.1rem", fontWeight: 700, color: "#0F766E" }}>{records.length} evaluation(s)</div>
+        </div>
+      </div>
+
+      {/* Timeline Feed */}
+      <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+        <h2 style={{ fontSize: "1.15rem", fontWeight: 700, color: "#111827", margin: "0.5rem 0 0", display: "flex", alignItems: "center", gap: "0.5rem" }}>
+          <Activity size={20} color="#0F766E" /> Longitudinal Care History
         </h2>
 
-        <div style={{ position: "relative" }}>
-          {/* Vertical line */}
-          <div style={{
-            position: "absolute",
-            left: "16px",
-            top: "20px",
-            bottom: "20px",
-            width: "2px",
-            background: "#E5E7EB",
-          }} />
+        {loading ? (
+          <div style={{ textAlign: "center", padding: "3rem", background: "white", borderRadius: "12px", border: "1px solid #E5E7EB" }}>
+            <Loader2 size={28} className="animate-spin" color="#0F766E" style={{ margin: "0 auto 0.5rem" }} />
+            <p style={{ color: "#6B7280", fontSize: "0.9rem", margin: 0 }}>Loading patient history records...</p>
+          </div>
+        ) : records.length === 0 ? (
+          <div style={{ background: "white", padding: "3rem", borderRadius: "12px", border: "1px solid #E5E7EB", textAlign: "center" }}>
+            <ShieldAlert size={36} color="#D1D5DB" style={{ margin: "0 auto 0.75rem" }} />
+            <h3 style={{ fontSize: "1.1rem", fontWeight: 700, color: "#111827", marginBottom: "0.35rem" }}>No History Records Found</h3>
+            <p style={{ color: "#6B7280", fontSize: "0.85rem", margin: 0 }}>
+              No previous AI predictions or self-check reports exist for patient ID <strong style={{ fontFamily: "monospace" }}>{patientId}</strong>.
+            </p>
+          </div>
+        ) : (
+          records.map((rec, index) => {
+            const risk = (rec.risk_level || "low").toLowerCase();
+            const style = RISK_STYLES[risk] || RISK_STYLES.low;
+            const isSelfCheck = rec.record_type === "patient_review" || rec.pathology?.includes("Self-Check");
 
-          {timeline.map((pred, i) => {
-            const style = RISK_STYLES[pred.risk_level.toLowerCase()] || RISK_STYLES.low;
-            const Icon = style.icon;
             return (
               <motion.div
-                key={pred.id}
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: i * 0.05 }}
+                key={rec.id || index}
+                initial={{ opacity: 0, y: 15 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: index * 0.04 }}
                 style={{
-                  display: "flex",
-                  gap: "1rem",
-                  marginBottom: "1rem",
-                  position: "relative",
+                  background: "white",
+                  borderRadius: "14px",
+                  border: `1.5px solid ${style.border}`,
+                  padding: "1.25rem 1.5rem",
+                  boxShadow: "0 2px 8px rgba(0,0,0,0.03)",
+                  position: "relative"
                 }}
               >
-                {/* Timeline dot */}
-                <div style={{
-                  width: "34px",
-                  height: "34px",
-                  borderRadius: "50%",
-                  background: "white",
-                  border: `3px solid ${style.bar}`,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  flexShrink: 0,
-                  zIndex: 1,
-                  boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
-                }}>
-                  <Icon size={16} color={style.text} />
-                </div>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "0.5rem", marginBottom: "0.75rem" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                    <span style={{
+                      padding: "0.25rem 0.65rem",
+                      background: isSelfCheck ? "#E0F2FE" : "#EFF6FF",
+                      color: isSelfCheck ? "#0369A1" : "#1D4ED8",
+                      borderRadius: "6px",
+                      fontSize: "0.75rem",
+                      fontWeight: 700,
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: "0.35rem"
+                    }}>
+                      {isSelfCheck ? <Stethoscope size={13} /> : <Brain size={13} />}
+                      {isSelfCheck ? "PATIENT SELF-CHECK REPORT" : "CLINICAL AI PREDICTION"}
+                    </span>
 
-                {/* Card */}
-                <div style={{
-                  flex: 1,
-                  background: "white",
-                  padding: "1rem 1.25rem",
-                  borderRadius: "12px",
-                  border: "1px solid #E5E7EB",
-                  boxShadow: "0 1px 3px rgba(0,0,0,0.05)",
-                }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "0.5rem" }}>
-                    <div>
-                      <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.375rem" }}>
-                        <span style={{
-                          padding: "0.2rem 0.5rem",
-                          background: style.bg,
-                          color: style.text,
-                          border: `1px solid ${style.border}`,
-                          borderRadius: "9999px",
-                          fontSize: "0.65rem",
-                          fontWeight: 700,
-                          textTransform: "uppercase",
-                        }}>
-                          {pred.risk_level}
-                        </span>
-                        <span style={{ fontSize: "0.7rem", color: "#6B7280", display: "flex", alignItems: "center", gap: "0.25rem" }}>
-                          <Calendar size={10} />
-                          {new Date(pred.created_at).toLocaleString()}
-                        </span>
-                        {i === 0 && (
-                          <span style={{
-                            padding: "0.15rem 0.4rem",
-                            background: "#0F766E",
-                            color: "white",
-                            borderRadius: "4px",
-                            fontSize: "0.6rem",
-                            fontWeight: 700,
-                          }}>
-                            LATEST
-                          </span>
-                        )}
-                      </div>
-                      <p style={{ fontSize: "0.8rem", color: "#4B5563" }}>
-                        <strong>Response:</strong> {pred.response} · <strong>Exam:</strong> {pred.physical_examination}
-                      </p>
-                    </div>
-                    <div style={{ textAlign: "right" }}>
-                      <p style={{
-                        fontFamily: "var(--font-space)",
-                        fontSize: "1.375rem",
-                        fontWeight: 700,
-                        color: style.text,
-                        lineHeight: 1,
-                      }}>
-                        {(pred.recurrence_probability * 100).toFixed(1)}%
-                      </p>
-                      <p style={{ fontSize: "0.65rem", color: "#6B7280", marginTop: "2px" }}>
-                        Confidence: {(pred.confidence * 100).toFixed(0)}%
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Progress bar */}
-                  <div style={{
-                    marginTop: "0.75rem",
-                    width: "100%",
-                    height: "6px",
-                    background: "#F3F4F6",
-                    borderRadius: "9999px",
-                    overflow: "hidden",
-                  }}>
-                    <div style={{
-                      width: `${pred.recurrence_probability * 100}%`,
-                      height: "100%",
-                      background: style.bar,
+                    <span style={{
+                      padding: "0.2rem 0.55rem",
+                      background: style.bg,
+                      color: style.text,
+                      border: `1px solid ${style.border}`,
                       borderRadius: "9999px",
-                      transition: "width 0.6s ease",
-                    }} />
+                      fontSize: "0.7rem",
+                      fontWeight: 700,
+                      textTransform: "uppercase"
+                    }}>
+                      {risk} RISK
+                    </span>
                   </div>
+
+                  <span style={{ fontSize: "0.75rem", color: "#6B7280", display: "inline-flex", alignItems: "center", gap: "0.3rem" }}>
+                    <Calendar size={12} />
+                    {new Date(rec.created_at).toLocaleString()}
+                  </span>
                 </div>
+
+                {/* Score & Main Info */}
+                <div style={{ display: "flex", gap: "1.5rem", alignItems: "baseline", marginBottom: "0.75rem", flexWrap: "wrap" }}>
+                  {rec.recurrence_probability !== undefined && (
+                    <div style={{ fontSize: "1.5rem", fontWeight: 700, color: style.text }}>
+                      {(rec.recurrence_probability * 100).toFixed(1)}% <span style={{ fontSize: "0.8rem", color: "#6B7280", fontWeight: 500 }}>Recurrence Score</span>
+                    </div>
+                  )}
+                  {rec.response && (
+                    <div style={{ fontSize: "0.9rem", color: "#374151" }}>
+                      <strong>Response:</strong> {rec.response}
+                    </div>
+                  )}
+                  {rec.t_stage && rec.t_stage !== "N/A" && (
+                    <div style={{ fontSize: "0.9rem", color: "#374151" }}>
+                      <strong>T/N Staging:</strong> {rec.t_stage} / {rec.n_stage}
+                    </div>
+                  )}
+                </div>
+
+                {/* Doctor Note / Action if present */}
+                {rec.doctor_note && (
+                  <div style={{ background: "#F0FDF4", border: "1px solid #86EFAC", padding: "0.85rem 1rem", borderRadius: "10px", marginBottom: "0.75rem" }}>
+                    <div style={{ fontSize: "0.8rem", fontWeight: 700, color: "#15803D", marginBottom: "0.2rem" }}>
+                      🩺 Doctor Advice & Verification:
+                    </div>
+                    <p style={{ margin: 0, fontSize: "0.9rem", color: "#14532D", lineHeight: 1.4 }}>
+                      "{rec.doctor_note}"
+                    </p>
+                    {rec.appointment_time && (
+                      <div style={{ marginTop: "0.4rem", fontSize: "0.8rem", fontWeight: 700, color: "#1E40AF" }}>
+                        🗓️ Scheduled Follow-up: {rec.appointment_time}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* SHAP Feature Driver Breakdown */}
+                {rec.shap_values && rec.shap_values.length > 0 && (
+                  <div style={{ background: "#F8FAFC", padding: "0.85rem 1rem", borderRadius: "10px", border: "1px solid #F1F5F9" }}>
+                    <div style={{ fontSize: "0.75rem", fontWeight: 700, color: "#64748B", marginBottom: "0.5rem", textTransform: "uppercase" }}>
+                      Key Feature Impact Factors (SHAP Analysis)
+                    </div>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "0.5rem" }}>
+                      {rec.shap_values.slice(0, 4).map((s, i) => (
+                        <div key={i} style={{ fontSize: "0.8rem", display: "flex", justifyContent: "space-between", background: "white", padding: "0.35rem 0.6rem", borderRadius: "6px", border: "1px solid #E2E8F0" }}>
+                          <span style={{ fontWeight: 600, color: "#334155" }}>{s.feature}: {s.value}</span>
+                          <span style={{ fontWeight: 700, color: s.direction === "positive" ? "#DC2626" : "#059669" }}>
+                            {s.direction === "positive" ? "+" : "-"}{(s.impact * 100).toFixed(1)}%
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </motion.div>
             );
-          })}
-        </div>
+          })
+        )}
       </div>
     </div>
   );

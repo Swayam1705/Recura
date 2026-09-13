@@ -1,11 +1,12 @@
 ﻿"use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  AlertCircle, AlertTriangle, Calendar, Check, CheckCircle2, DollarSign,
-  FileText, HeartPulse, MessageSquare, RefreshCw, Send, ShieldCheck, Stethoscope
+  ShieldCheck, AlertTriangle, AlertCircle, CheckCircle2, DollarSign,
+  RefreshCw, FileText, HeartPulse, Send, Check, Stethoscope, Calendar, MessageSquare
 } from "lucide-react";
+import { generatePatientFriendlyReport } from "@/lib/generateReport";
 
 export default function PatientCheckPage() {
   const [patient, setPatient] = useState<any>({});
@@ -19,21 +20,24 @@ export default function PatientCheckPage() {
     swallowing_issue: false,
     years_since_surgery: 1,
   });
+
   const [loading, setLoading] = useState(false);
   const [sendingDoctor, setSendingDoctor] = useState(false);
   const [sentDoctor, setSentDoctor] = useState(false);
   const [result, setResult] = useState<any>(null);
   const [doctorFeedback, setDoctorFeedback] = useState<any[]>([]);
-  const [printDoc, setPrintDoc] = useState<any>(null);
 
   const fetchDoctorResponses = useCallback(async (pId: string) => {
     if (!pId) return;
     try {
       const res = await fetch(`http://127.0.0.1:8000/patient/${pId}/doctor-instructions`);
-      if (!res.ok) return;
-      const data = await res.json();
-      setDoctorFeedback(Array.isArray(data) ? data : []);
-    } catch {}
+      if (res.ok) {
+        const data = await res.json();
+        setDoctorFeedback(data || []);
+      }
+    } catch (err) {
+      console.error(err);
+    }
   }, []);
 
   useEffect(() => {
@@ -43,9 +47,11 @@ export default function PatientCheckPage() {
       const key = `PT-P${p.id || "101"}`;
       setPatientKey(key);
       fetchDoctorResponses(key);
-      const t = setInterval(() => fetchDoctorResponses(key), 4000);
-      return () => clearInterval(t);
-    } catch {}
+      const interval = setInterval(() => fetchDoctorResponses(key), 4000);
+      return () => clearInterval(interval);
+    } catch (e) {
+      console.error(e);
+    }
   }, [fetchDoctorResponses]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -56,9 +62,15 @@ export default function PatientCheckPage() {
       const res = await fetch("http://127.0.0.1:8000/patient/self-check", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ patient_name: patient.name || "Patient", ...formData }),
+        body: JSON.stringify({
+          patient_name: patient.name || "Patient",
+          ...formData,
+        }),
       });
-      setResult(await res.json());
+      const data = await res.json();
+      setResult(data);
+    } catch (err) {
+      console.error("Self-check failed:", err);
     } finally {
       setLoading(false);
     }
@@ -74,95 +86,141 @@ export default function PatientCheckPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           patient_id: pId,
-          patient_name: patient.name || "Patient",
+          patient_name: patient.name || "Anonymous Patient",
           doctor_id: patient.linked_doctor_id || 1,
           self_check_data: result,
         }),
       });
+
       if (res.ok) {
         setSentDoctor(true);
         fetchDoctorResponses(pId);
       }
+    } catch (err) {
+      console.error("Failed to send report:", err);
     } finally {
       setSendingDoctor(false);
     }
   };
 
-  // Build a dedicated printable certificate, then print
-  const downloadDoctorPdf = (fb: any) => {
-    setPrintDoc({
-      patientName: patient.name || fb.patient_name || "Patient",
-      patientId: fb.patient_id || patientKey,
-      doctorNote: fb.doctor_note || "Reviewed and recorded.",
-      action: fb.doctor_action || "REVIEWED",
-      appointment: fb.appointment_time || "",
-      reviewedAt: fb.reviewed_at || fb.created_at || new Date().toLocaleString(),
-      selfCheck: fb.self_check_json || result || {},
-    });
-    setTimeout(() => window.print(), 250);
-  };
+  const handleDownloadPDF = (fb?: any) => {
+    const reportObj = {
+      patientId: fb?.patient_id || patientKey || "PT-P101",
+      prediction: 0,
+      recurrenceProbability: (fb?.self_check_json?.riskScore || result?.riskScore || 10) / 100,
+      confidence: 0.90,
+      riskLevel: fb?.self_check_json?.color === "red" ? "high" : (fb?.self_check_json?.color === "yellow" ? "medium" : "low"),
+      status: fb?.self_check_json?.title || result?.title || "Thyroid Recovery Self-Check",
+      timestamp: fb?.created_at || new Date().toISOString(),
+    };
 
-  const downloadSelfCheckPdf = () => {
-    if (!result) return;
-    setPrintDoc({
-      patientName: patient.name || "Patient",
-      patientId: patientKey,
-      doctorNote: "Self-check only (not yet doctor-signed).",
-      action: "SELF_CHECK",
-      appointment: "",
-      reviewedAt: new Date().toLocaleString(),
-      selfCheck: result,
-    });
-    setTimeout(() => window.print(), 250);
+    generatePatientFriendlyReport(
+      reportObj,
+      fb?.doctor_note || "Your recovery self-check has been evaluated and logged in your clinical record.",
+      fb?.appointment_time
+    );
   };
-
-  const reviewedCount = doctorFeedback.filter((x) => x.status === "REVIEWED").length;
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
-      {/* SCREEN UI */}
-      <div className="no-print">
-        <div style={{ display: "inline-flex", gap: 8, alignItems: "center", background: "#E0F2FE", color: "#0369A1", borderRadius: 999, padding: "0.3rem 0.75rem", fontWeight: 700, fontSize: 13 }}>
-          <HeartPulse size={14} /> Welcome, {patient.name || "Patient"}
+    <div style={{ display: "flex", flexDirection: "column", gap: "2rem" }}>
+      {/* Header */}
+      <div>
+        <div style={{ display: "inline-flex", alignItems: "center", gap: "0.5rem", padding: "0.35rem 0.85rem", background: "#E0F2FE", color: "#0369A1", borderRadius: 999, fontSize: "0.8rem", fontWeight: 700, marginBottom: "0.75rem" }}>
+          <HeartPulse size={14} />
+          Welcome, {patient.name || "Patient"}
         </div>
-        <h1 style={{ margin: "0.55rem 0 0.2rem", fontSize: "1.9rem", fontWeight: 800 }}>Thyroid Recovery Self-Check</h1>
-        <p style={{ margin: 0, color: "#64748B" }}>Run check → send to doctor → receive recommendation + signed PDF.</p>
-        {reviewedCount > 0 && (
-          <div style={{ marginTop: 10, background: "#ECFDF5", border: "1px solid #A7F3D0", color: "#065F46", borderRadius: 10, padding: "0.65rem 0.85rem", fontWeight: 700 }}>
-            You have {reviewedCount} doctor recommendation(s)
-          </div>
-        )}
+        <h1 style={{ fontSize: "2rem", fontWeight: 700, color: "#0F172A", margin: 0 }}>Thyroid Recovery Self-Check</h1>
+        <p style={{ color: "#4B5563", marginTop: "0.35rem" }}>
+          Enter your blood test numbers to get AI guidance and send reports directly to your doctor.
+        </p>
       </div>
 
+      {/* Doctor Response Feed Section */}
       {doctorFeedback.length > 0 && (
-        <div className="no-print" style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-          <h2 style={{ margin: 0, display: "flex", gap: 8, alignItems: "center", fontSize: "1.15rem" }}>
-            <Stethoscope size={18} color="#0F766E" /> Doctor Notifications
+        <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+          <h2 style={{ fontSize: "1.25rem", fontWeight: 700, color: "#0F172A", display: "flex", alignItems: "center", gap: "0.5rem", margin: 0 }}>
+            <Stethoscope size={20} color="#0F766E" /> Doctor Notifications
           </h2>
+
           {doctorFeedback.map((fb) => {
-            const reviewed = fb.status === "REVIEWED";
+            const isReviewed = fb.status === "REVIEWED";
             return (
-              <div key={fb.id} style={{ background: reviewed ? "#F0FDF4" : "#FFFBEB", border: `1px solid ${reviewed ? "#86EFAC" : "#FDE68A"}`, borderRadius: 12, padding: "1rem" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", gap: 8, flexWrap: "wrap" }}>
-                  <strong>{reviewed ? "Doctor Replied" : "Waiting for Doctor"}</strong>
-                  <span style={{ fontSize: 12, color: "#64748B" }}>{fb.created_at}</span>
+              <div
+                key={fb.id}
+                style={{
+                  background: isReviewed ? "#F0FDF4" : "#FFFBEB",
+                  border: `1.5px solid ${isReviewed ? "#86EFAC" : "#FDE68A"}`,
+                  borderRadius: "14px",
+                  padding: "1.25rem",
+                  boxShadow: "0 4px 12px rgba(0,0,0,0.03)",
+                }}
+              >
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "0.75rem", flexWrap: "wrap", gap: "0.5rem" }}>
+                  <span
+                    style={{
+                      padding: "0.25rem 0.75rem",
+                      borderRadius: "9999px",
+                      fontSize: "0.75rem",
+                      fontWeight: 700,
+                      background: isReviewed ? "#DCFCE7" : "#FEF3C7",
+                      color: isReviewed ? "#15803D" : "#B45309",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "0.35rem",
+                    }}
+                  >
+                    {isReviewed ? <CheckCircle2 size={14} /> : <RefreshCw className="animate-spin" size={14} />}
+                    {isReviewed ? "DOCTOR REPLIED" : "AWAITING DOCTOR REVIEW"}
+                  </span>
+
+                  <span style={{ fontSize: "0.75rem", color: "#64748B" }}>
+                    Submitted: {fb.created_at}
+                  </span>
                 </div>
-                {!reviewed ? (
-                  <p style={{ margin: "0.5rem 0 0", color: "#92400E" }}>Your report is in the doctor inbox.</p>
-                ) : (
-                  <div style={{ marginTop: 8, background: "white", border: "1px solid #E2E8F0", borderRadius: 10, padding: "0.8rem" }}>
-                    <div style={{ display: "flex", gap: 6, alignItems: "center", fontWeight: 700 }}><MessageSquare size={15} /> Recommendation</div>
-                    <p style={{ margin: "0.4rem 0" }}>{fb.doctor_note || "Reviewed and recorded."}</p>
-                    <div style={{ fontSize: 13, color: "#475569" }}><b>Action:</b> {fb.doctor_action || "REVIEWED"}</div>
+
+                {isReviewed ? (
+                  <div style={{ background: "white", padding: "1rem", borderRadius: "10px", border: "1px solid #E2E8F0" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", fontWeight: 700, color: "#0F172A", marginBottom: "0.5rem" }}>
+                      <MessageSquare size={16} color="#0F766E" /> Recommendation:
+                    </div>
+                    <p style={{ margin: "0 0 0.75rem", fontSize: "0.95rem", color: "#334155", lineHeight: 1.5 }}>
+                      "{fb.doctor_note || "Your report is reviewed. Continue routine monitoring."}"
+                    </p>
+
+                    <div style={{ fontSize: "0.85rem", color: "#475569", marginBottom: "0.5rem" }}>
+                      <strong>Action:</strong> {fb.doctor_action || "REVIEWED"}
+                    </div>
+
                     {fb.appointment_time && (
-                      <div style={{ marginTop: 6, display: "flex", gap: 6, alignItems: "center", color: "#1D4ED8", fontWeight: 700 }}>
-                        <Calendar size={14} /> {fb.appointment_time}
+                      <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", background: "#EFF6FF", color: "#1E40AF", padding: "0.5rem 0.75rem", borderRadius: "6px", fontSize: "0.85rem", fontWeight: 700, marginBottom: "0.75rem" }}>
+                        <Calendar size={16} /> Visit on {fb.appointment_time}
                       </div>
                     )}
-                    <button type="button" onClick={() => downloadDoctorPdf(fb)} style={{ marginTop: 10, border: "none", background: "#0F766E", color: "white", borderRadius: 8, padding: "0.5rem 0.8rem", fontWeight: 700, cursor: "pointer", display: "inline-flex", gap: 6, alignItems: "center" }}>
-                      <FileText size={14} /> Download Doctor-Signed PDF
+
+                    <button
+                      type="button"
+                      onClick={() => handleDownloadPDF(fb)}
+                      style={{
+                        padding: "0.65rem 1.25rem",
+                        background: "#0F766E",
+                        color: "white",
+                        border: "none",
+                        borderRadius: "8px",
+                        fontSize: "0.85rem",
+                        fontWeight: 700,
+                        cursor: "pointer",
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: "0.4rem",
+                      }}
+                    >
+                      <FileText size={16} /> Download Doctor-Signed PDF
                     </button>
                   </div>
+                ) : (
+                  <p style={{ margin: 0, fontSize: "0.875rem", color: "#78350F" }}>
+                    Your self-check report was delivered to your doctor's inbox. You will receive real-time verification here once reviewed.
+                  </p>
                 )}
               </div>
             );
@@ -170,140 +228,165 @@ export default function PatientCheckPage() {
         </div>
       )}
 
-      <div className="no-print" style={{ background: "white", border: "1px solid #E2E8F0", borderRadius: 14, padding: "1.2rem" }}>
-        <form onSubmit={handleSubmit} style={{ display: "grid", gap: 14 }}>
+      {/* Input Self-Check Form */}
+      <div style={{ background: "white", borderRadius: 16, border: "1px solid #E5E7EB", overflow: "hidden" }}>
+        <form onSubmit={handleSubmit} style={{ padding: "1.75rem", display: "flex", flexDirection: "column", gap: "1.5rem" }}>
           <div>
-            <label style={{ fontWeight: 700, fontSize: 13 }}>Age</label>
-            <input type="number" value={formData.age} onChange={(e) => setFormData({ ...formData, age: Number(e.target.value) })} style={{ width: "100%", marginTop: 4, padding: 10, borderRadius: 8, border: "1px solid #CBD5E1" }} />
+            <label style={{ fontSize: "0.85rem", fontWeight: 600, color: "#374151" }}>Age</label>
+            <input
+              type="number"
+              value={formData.age}
+              onChange={(e) => setFormData({ ...formData, age: Number(e.target.value) })}
+              style={{ width: "100%", padding: "0.65rem 0.85rem", borderRadius: 8, border: "1px solid #D1D5DB", marginTop: 4 }}
+            />
           </div>
-          <div style={{ background: "#F8FAFC", borderRadius: 10, padding: 12 }}>
-            <div style={{ fontWeight: 800 }}>Blood Test</div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 8 }}>
+
+          <div style={{ background: "#F9FAFB", padding: "1.25rem", borderRadius: 12, border: "1px solid #F3F4F6" }}>
+            <h3 style={{ fontSize: "1rem", fontWeight: 700, color: "#111827", marginTop: 0 }}>1. Blood Test Results</h3>
+            <p style={{ fontSize: "0.8rem", color: "#6B7280" }}>
+              Find <strong>Thyroglobulin (Tg)</strong> on your lab report. Normal after surgery is below 0.2 ng/mL.
+            </p>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
               <div>
-                <label style={{ fontSize: 13, fontWeight: 700 }}>Tg (ng/mL)</label>
-                <input type="number" step="0.01" value={formData.tg_level} onChange={(e) => setFormData({ ...formData, tg_level: Number(e.target.value) })} style={{ width: "100%", marginTop: 4, padding: 10, borderRadius: 8, border: "1px solid #CBD5E1" }} />
+                <label style={{ fontSize: "0.85rem", fontWeight: 600 }}>Tg Level (ng/mL)</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={formData.tg_level}
+                  onChange={(e) => setFormData({ ...formData, tg_level: Number(e.target.value) })}
+                  style={{ width: "100%", padding: "0.65rem 0.85rem", borderRadius: 8, border: "1px solid #D1D5DB", marginTop: 4, fontWeight: 700, color: "#0F766E" }}
+                />
               </div>
               <div>
-                <label style={{ fontSize: 13, fontWeight: 700 }}>TgAB</label>
-                <button type="button" onClick={() => setFormData({ ...formData, tgab_positive: !formData.tgab_positive })} style={{ width: "100%", marginTop: 4, padding: 10, borderRadius: 8, border: "1px solid #CBD5E1", background: formData.tgab_positive ? "#FEF3C7" : "white", fontWeight: 700, cursor: "pointer" }}>
-                  {formData.tgab_positive ? "Positive" : "Normal"}
+                <label style={{ fontSize: "0.85rem", fontWeight: 600 }}>Tg Antibodies (TgAB)</label>
+                <button
+                  type="button"
+                  onClick={() => setFormData({ ...formData, tgab_positive: !formData.tgab_positive })}
+                  style={{
+                    width: "100%", padding: "0.65rem", borderRadius: 8, marginTop: 4,
+                    border: `1px solid ${formData.tgab_positive ? "#FCD34D" : "#D1D5DB"}`,
+                    background: formData.tgab_positive ? "#FEF3C7" : "white",
+                    color: formData.tgab_positive ? "#92400E" : "#4B5563",
+                    fontWeight: 600, cursor: "pointer",
+                  }}
+                >
+                  {formData.tgab_positive ? "⚠️ Positive" : "✅ Normal"}
                 </button>
               </div>
             </div>
           </div>
+
           <div>
-            <div style={{ fontWeight: 800, marginBottom: 8 }}>Symptoms</div>
-            <div style={{ display: "grid", gap: 8 }}>
+            <h3 style={{ fontSize: "1rem", fontWeight: 700, color: "#111827" }}>2. Symptom Check</h3>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "0.75rem" }}>
               {[
-                ["neck_lump", "New neck lump/swelling"],
-                ["voice_changes", "Voice hoarseness"],
-                ["swallowing_issue", "Swallowing difficulty"],
-              ].map(([k, label]) => (
-                <label key={k} style={{ display: "flex", gap: 8, alignItems: "center", border: "1px solid #E2E8F0", borderRadius: 8, padding: "0.6rem 0.75rem" }}>
-                  <input type="checkbox" checked={(formData as any)[k]} onChange={(e) => setFormData({ ...formData, [k]: e.target.checked })} />
-                  {label}
+                { key: "neck_lump", label: "New lump or swelling in neck" },
+                { key: "voice_changes", label: "Persistent voice hoarseness" },
+                { key: "swallowing_issue", label: "Difficulty swallowing food" },
+              ].map((item) => (
+                <label key={item.key} style={{
+                  display: "flex", alignItems: "center", gap: 8, padding: "0.75rem",
+                  borderRadius: 8, border: "1px solid #E5E7EB",
+                  background: (formData as any)[item.key] ? "#EFF6FF" : "white",
+                  cursor: "pointer", fontSize: "0.85rem", fontWeight: 500,
+                }}>
+                  <input type="checkbox" checked={(formData as any)[item.key]} onChange={(e) => setFormData({ ...formData, [item.key]: e.target.checked })} />
+                  {item.label}
                 </label>
               ))}
             </div>
           </div>
-          <button type="submit" disabled={loading} style={{ border: "none", borderRadius: 10, padding: "0.8rem", background: "linear-gradient(135deg,#0F766E,#0D9488)", color: "white", fontWeight: 800, cursor: "pointer", display: "flex", justifyContent: "center", gap: 8 }}>
-            {loading ? <RefreshCw className="animate-spin" size={16} /> : <ShieldCheck size={16} />}
+
+          <button
+            type="submit"
+            disabled={loading}
+            style={{
+              padding: "0.85rem", background: "linear-gradient(135deg,#0F766E,#0D9488)",
+              color: "white", border: "none", borderRadius: 10, fontWeight: 700,
+              fontSize: "1rem", cursor: "pointer", display: "flex", alignItems: "center",
+              justifyContent: "center", gap: 8,
+            }}
+          >
+            {loading ? <RefreshCw className="animate-spin" size={18} /> : <ShieldCheck size={18} />}
             {loading ? "Analyzing..." : "Run Free Self-Check"}
           </button>
         </form>
       </div>
 
+      {/* Screen Result Container */}
       <AnimatePresence>
         {result && (
-          <motion.div className="no-print" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} style={{ borderRadius: 14, padding: "1.2rem", background: result.color === "green" ? "#F0FDF4" : result.color === "yellow" ? "#FFFBEB" : "#FEF2F2", border: `1px solid ${result.color === "green" ? "#86EFAC" : result.color === "yellow" ? "#FDE68A" : "#FCA5A5"}` }}>
-            <div style={{ display: "flex", gap: 10 }}>
-              {result.color === "green" ? <CheckCircle2 color="#16A34A" /> : result.color === "yellow" ? <AlertCircle color="#D97706" /> : <AlertTriangle color="#DC2626" />}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            style={{
+              background: result.color === "green" ? "#F0FDF4" : result.color === "yellow" ? "#FFFBEB" : "#FEF2F2",
+              border: `2px solid ${result.color === "green" ? "#86EFAC" : result.color === "yellow" ? "#FDE68A" : "#FCA5A5"}`,
+              borderRadius: 16, padding: "2rem",
+            }}
+          >
+            <div style={{ display: "flex", gap: "1rem", marginBottom: "1.25rem" }}>
+              {result.color === "green" ? <CheckCircle2 size={36} color="#16A34A" />
+                : result.color === "yellow" ? <AlertCircle size={36} color="#D97706" />
+                : <AlertTriangle size={36} color="#DC2626" />}
               <div>
-                <h3 style={{ margin: 0 }}>{result.title}</h3>
-                <p style={{ margin: "0.35rem 0 0" }}>{result.message}</p>
+                <h2 style={{ fontSize: "1.5rem", fontWeight: 700, margin: 0,
+                  color: result.color === "green" ? "#14532D" : result.color === "yellow" ? "#78350F" : "#7F1D1D" }}>
+                  {result.title}
+                </h2>
+                <p style={{ color: "#374151", marginTop: 4 }}>{result.message}</p>
               </div>
             </div>
+
             {result.consultationSaved && (
-              <div style={{ marginTop: 10, background: "white", borderRadius: 10, padding: "0.7rem 0.85rem", display: "flex", gap: 8, alignItems: "center" }}>
-                <DollarSign size={16} color="#16A34A" />
-                <span>Estimated savings: <b>{result.estimatedMoneySaved}</b></span>
+              <div style={{ background: "white", padding: "0.85rem 1.25rem", borderRadius: 10, border: "1px solid #BBF7D0", display: "flex", alignItems: "center", gap: "0.75rem", marginBottom: "1.25rem" }}>
+                <DollarSign size={22} color="#16A34A" />
+                <div>
+                  <div style={{ fontWeight: 700, color: "#15803D", fontSize: "0.85rem" }}>Doctor Consultation Not Needed</div>
+                  <div style={{ fontSize: "0.75rem", color: "#4B5563" }}>You saved an estimated <strong>{result.estimatedMoneySaved}</strong> today.</div>
+                </div>
               </div>
             )}
-            <div style={{ marginTop: 10, background: "white", borderRadius: 10, padding: "0.85rem" }}>
-              <div style={{ fontSize: 12, fontWeight: 800, color: "#64748B" }}>RECOMMENDED ACTION</div>
-              <div style={{ fontWeight: 700 }}>{result.recommendation}</div>
-              <ul style={{ margin: "0.5rem 0 0", paddingLeft: 18 }}>
-                {(result.reasons || []).map((r: string, i: number) => <li key={i}>{r}</li>)}
+
+            <div style={{ background: "white", padding: "1.25rem", borderRadius: 12, border: "1px solid #E5E7EB" }}>
+              <div style={{ fontSize: "0.75rem", fontWeight: 700, color: "#6B7280", textTransform: "uppercase" }}>Recommended Action</div>
+              <p style={{ fontWeight: 600, color: "#111827", margin: "0.25rem 0" }}>{result.recommendation}</p>
+              <ul style={{ margin: "0.75rem 0 0", paddingLeft: "1.25rem", fontSize: "0.8rem", color: "#4B5563" }}>
+                {result.reasons.map((r: string, i: number) => <li key={i}>{r}</li>)}
               </ul>
             </div>
-            <div style={{ marginTop: 12, display: "flex", gap: 8, flexWrap: "wrap" }}>
-              <button type="button" onClick={handleSendToDoctor} disabled={sendingDoctor || sentDoctor} style={{ border: "none", borderRadius: 8, padding: "0.6rem 0.9rem", background: sentDoctor ? "#16A34A" : "#2563EB", color: "white", fontWeight: 800, cursor: "pointer", display: "inline-flex", gap: 6, alignItems: "center" }}>
-                {sendingDoctor ? <RefreshCw className="animate-spin" size={14} /> : sentDoctor ? <Check size={14} /> : <Send size={14} />}
-                {sentDoctor ? "Sent to Doctor" : "Send Report to Doctor"}
+
+            <div style={{ marginTop: "1.5rem", display: "flex", justifyContent: "space-between", gap: "1rem", flexWrap: "wrap" }}>
+              <button
+                type="button"
+                onClick={handleSendToDoctor}
+                disabled={sendingDoctor || sentDoctor}
+                style={{
+                  padding: "0.65rem 1.25rem",
+                  background: sentDoctor ? "#16A34A" : "linear-gradient(135deg,#2563EB,#1D4ED8)",
+                  color: "white", border: "none", borderRadius: 8, fontWeight: 700,
+                  cursor: sentDoctor ? "default" : "pointer", display: "flex", alignItems: "center", gap: 8,
+                }}
+              >
+                {sendingDoctor ? <RefreshCw className="animate-spin" size={16} /> : sentDoctor ? <Check size={16} /> : <Send size={16} />}
+                {sentDoctor ? "Report Sent to Doctor!" : sendingDoctor ? "Sending..." : "Send Report to My Doctor"}
               </button>
-              <button type="button" onClick={downloadSelfCheckPdf} style={{ border: "1px solid #CBD5E1", borderRadius: 8, padding: "0.6rem 0.9rem", background: "white", fontWeight: 700, cursor: "pointer", display: "inline-flex", gap: 6, alignItems: "center" }}>
-                <FileText size={14} /> Save Self-Check PDF
+
+              <button
+                type="button"
+                onClick={() => handleDownloadPDF()}
+                style={{
+                  padding: "0.65rem 1.25rem", background: "white", color: "#374151",
+                  border: "1px solid #D1D5DB", borderRadius: 8, fontWeight: 600,
+                  cursor: "pointer", display: "flex", alignItems: "center", gap: 8,
+                }}
+              >
+                <FileText size={16} /> Save Self-Check PDF
               </button>
             </div>
           </motion.div>
         )}
       </AnimatePresence>
-
-      {/* PRINT-ONLY CERTIFICATE (this is what becomes the PDF) */}
-      {printDoc && (
-        <div id="doctor-signed-print" className="print-only" style={{ display: "none", background: "white", color: "#0F172A", padding: 24, fontFamily: "Arial, sans-serif" }}>
-          <div style={{ border: "2px solid #0F766E", borderRadius: 12, padding: 24 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 16 }}>
-              <div>
-                <div style={{ fontSize: 22, fontWeight: 800, color: "#0F766E" }}>Recura Clinical Report</div>
-                <div style={{ fontSize: 12, color: "#64748B" }}>Doctor-Verified Patient Self-Check Summary</div>
-              </div>
-              <div style={{ textAlign: "right", fontSize: 12, color: "#64748B" }}>
-                <div>Generated: {new Date().toLocaleString()}</div>
-                <div>Reviewed: {printDoc.reviewedAt}</div>
-              </div>
-            </div>
-
-            <div style={{ marginBottom: 14, padding: 12, background: "#F8FAFC", borderRadius: 8 }}>
-              <div><b>Patient:</b> {printDoc.patientName}</div>
-              <div><b>Patient ID:</b> {printDoc.patientId}</div>
-              <div><b>Doctor Action:</b> {printDoc.action}</div>
-              {printDoc.appointment ? <div><b>Follow-up:</b> {printDoc.appointment}</div> : null}
-            </div>
-
-            <div style={{ marginBottom: 14 }}>
-              <div style={{ fontWeight: 800, marginBottom: 6 }}>AI Self-Check Summary</div>
-              <div><b>Status:</b> {printDoc.selfCheck?.title || printDoc.selfCheck?.status || "N/A"}</div>
-              <div style={{ marginTop: 4 }}>{printDoc.selfCheck?.message || ""}</div>
-              <div style={{ marginTop: 4 }}><b>Recommendation:</b> {printDoc.selfCheck?.recommendation || "N/A"}</div>
-              <div style={{ marginTop: 4 }}><b>Risk Score:</b> {printDoc.selfCheck?.riskScore ?? "N/A"}</div>
-              <ul>
-                {(printDoc.selfCheck?.reasons || []).map((r: string, i: number) => <li key={i}>{r}</li>)}
-              </ul>
-            </div>
-
-            <div style={{ marginBottom: 14, padding: 12, border: "1px solid #A7F3D0", background: "#F0FDF4", borderRadius: 8 }}>
-              <div style={{ fontWeight: 800, marginBottom: 6 }}>Doctor Recommendation</div>
-              <div style={{ fontSize: 15, lineHeight: 1.5 }}>{printDoc.doctorNote}</div>
-            </div>
-
-            <div style={{ marginTop: 28, display: "flex", justifyContent: "space-between", fontSize: 12, color: "#64748B" }}>
-              <div>
-                <div style={{ borderTop: "1px solid #94A3B8", width: 180, marginBottom: 4 }} />
-                Doctor Digital Acknowledgement
-              </div>
-              <div>
-                <div style={{ borderTop: "1px solid #94A3B8", width: 180, marginBottom: 4 }} />
-                Recura Patient Companion
-              </div>
-            </div>
-
-            <p style={{ marginTop: 18, fontSize: 11, color: "#94A3B8" }}>
-              This document is a clinical communication aid and not an emergency medical service.
-            </p>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
