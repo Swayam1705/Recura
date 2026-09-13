@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { motion } from "framer-motion";
 import Link from "next/link";
@@ -223,7 +223,7 @@ export default function Hero() {
                 e.currentTarget.style.borderColor = "rgba(147, 197, 253, 0.35)";
               }}
             >
-              â¤ï¸ Patient Self-Check
+               Patient Self-Check
             </Link>
 
             <Link
@@ -250,7 +250,7 @@ export default function Hero() {
                 e.currentTarget.style.transform = "scale(1)";
               }}
             >
-              ðŸ©º Doctor Sign In
+               Doctor Sign In
             </Link>
           </div>
         </div>
@@ -370,7 +370,7 @@ export default function Hero() {
             >
               Research-grade{" "}
               <span style={{ color: "white", fontWeight: "500" }}>explainable AI</span> for
-              clinical decision support â€” with SHAP transparency, note parsing, patient history,
+              clinical decision support  with SHAP transparency, note parsing, patient history,
               and high-risk alerts.
             </motion.p>
 

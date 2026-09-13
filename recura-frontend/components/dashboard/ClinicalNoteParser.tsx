@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Wand2, Loader2, CheckCircle, AlertCircle, FileText } from "lucide-react";
+import { Wand2, Loader2, CheckCircle, AlertCircle, FileText, Mic, MicOff } from "lucide-react";
 
 const SAMPLE_NOTE = `Patient: Female, 47 years old.
 Diagnosis: Papillary thyroid carcinoma, left lobe.
@@ -19,8 +19,51 @@ interface ClinicalNoteParserProps {
 export default function ClinicalNoteParser({ onExtract }: ClinicalNoteParserProps) {
   const [notes, setNotes] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isListening, setIsListening] = useState(false);
   const [extractedFields, setExtractedFields] = useState<any[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const recognitionRef = useRef<any>(null);
+
+  // FEATURE 3: LIVE AMBIENT VOICE DICTATION
+  const toggleListening = () => {
+    if (isListening) {
+      if (recognitionRef.current) recognitionRef.current.stop();
+      setIsListening(false);
+      return;
+    }
+
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      setError("Speech recognition is not supported in this browser. Try Chrome/Edge.");
+      return;
+    }
+
+    const recognition = new SpeechRecognition();
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.lang = "en-US";
+
+    recognition.onresult = (event: any) => {
+      let currentTranscript = "";
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        currentTranscript += event.results[i][0].transcript;
+      }
+      setNotes((prev) => (prev ? prev + " " + currentTranscript : currentTranscript));
+    };
+
+    recognition.onerror = (e: any) => {
+      console.error("Speech Error:", e);
+      setIsListening(false);
+    };
+
+    recognition.onend = () => {
+      setIsListening(false);
+    };
+
+    recognitionRef.current = recognition;
+    recognition.start();
+    setIsListening(true);
+  };
 
   const handleParse = async () => {
     if (!notes.trim()) return;
@@ -84,6 +127,8 @@ export default function ClinicalNoteParser({ onExtract }: ClinicalNoteParserProp
         justifyContent: "space-between",
         paddingBottom: "1.25rem",
         borderBottom: "1px solid #F3F4F6",
+        flexWrap: "wrap",
+        gap: "0.5rem"
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: "0.875rem" }}>
           <div style={{
@@ -104,31 +149,54 @@ export default function ClinicalNoteParser({ onExtract }: ClinicalNoteParserProp
               color: "#111827",
               fontSize: "1.125rem",
             }}>
-              AI Note Parser
+              AI Note Parser & Voice Scribe
             </h2>
             <p style={{ color: "#6B7280", fontSize: "0.8rem", marginTop: "2px" }}>
-              Paste clinical notes and auto-fill form
+              Speak or paste clinical notes to auto-fill form
             </p>
           </div>
         </div>
-        <button
-          onClick={() => setNotes(SAMPLE_NOTE)}
-          style={{
-            fontSize: "0.75rem",
-            color: "#7C3AED",
-            fontWeight: "700",
-            padding: "0.5rem 0.875rem",
-            borderRadius: "8px",
-            backgroundColor: "#F5F3FF",
-            border: "none",
-            cursor: "pointer",
-            transition: "all 0.2s",
-          }}
-          onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = "#EDE9FE"; }}
-          onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "#F5F3FF"; }}
-        >
-          Use Sample
-        </button>
+
+        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          {/* VOICE DICTATION BUTTON */}
+          <button
+            type="button"
+            onClick={toggleListening}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 6,
+              fontSize: "0.75rem",
+              color: isListening ? "#DC2626" : "#0284C7",
+              fontWeight: "700",
+              padding: "0.5rem 0.875rem",
+              borderRadius: "8px",
+              backgroundColor: isListening ? "#FEF2F2" : "#F0F9FF",
+              border: isListening ? "1.5px solid #FCA5A5" : "1px solid #BAE6FD",
+              cursor: "pointer",
+            }}
+          >
+            {isListening ? <MicOff size={14} className="animate-pulse" /> : <Mic size={14} />}
+            {isListening ? "Stop Dictation" : "🎙️ Voice Dictate"}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setNotes(SAMPLE_NOTE)}
+            style={{
+              fontSize: "0.75rem",
+              color: "#7C3AED",
+              fontWeight: "700",
+              padding: "0.5rem 0.875rem",
+              borderRadius: "8px",
+              backgroundColor: "#F5F3FF",
+              border: "none",
+              cursor: "pointer",
+            }}
+          >
+            Use Sample
+          </button>
+        </div>
       </div>
 
       <div style={{ position: "relative" }}>
@@ -136,7 +204,7 @@ export default function ClinicalNoteParser({ onExtract }: ClinicalNoteParserProp
         <textarea
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
-          placeholder="Paste raw clinical notes here..."
+          placeholder={isListening ? "Listening... Speak clinical observations clearly..." : "Paste or dictate clinical notes here..."}
           rows={5}
           style={{
             width: "100%",
@@ -145,8 +213,8 @@ export default function ClinicalNoteParser({ onExtract }: ClinicalNoteParserProp
             paddingTop: "0.875rem",
             paddingBottom: "0.875rem",
             borderRadius: "10px",
-            backgroundColor: "#F9FAFB",
-            border: "1.5px solid #E5E7EB",
+            backgroundColor: isListening ? "#FFF5F5" : "#F9FAFB",
+            border: isListening ? "1.5px solid #EF4444" : "1.5px solid #E5E7EB",
             color: "#111827",
             fontSize: "0.875rem",
             resize: "none",
@@ -155,20 +223,11 @@ export default function ClinicalNoteParser({ onExtract }: ClinicalNoteParserProp
             outline: "none",
             transition: "all 0.2s",
           }}
-          onFocus={(e) => {
-            e.target.style.borderColor = "#7C3AED";
-            e.target.style.backgroundColor = "white";
-            e.target.style.boxShadow = "0 0 0 4px rgba(124, 58, 237, 0.1)";
-          }}
-          onBlur={(e) => {
-            e.target.style.borderColor = "#E5E7EB";
-            e.target.style.backgroundColor = "#F9FAFB";
-            e.target.style.boxShadow = "none";
-          }}
         />
       </div>
 
       <button
+        type="button"
         onClick={handleParse}
         disabled={isProcessing || !notes.trim()}
         style={{
@@ -186,11 +245,8 @@ export default function ClinicalNoteParser({ onExtract }: ClinicalNoteParserProp
           justifyContent: "center",
           gap: "0.5rem",
           boxShadow: "0 10px 25px rgba(124, 58, 237, 0.35)",
-          transition: "all 0.3s",
           opacity: isProcessing || !notes.trim() ? 0.5 : 1,
         }}
-        onMouseEnter={(e) => { if (!isProcessing && notes.trim()) e.currentTarget.style.transform = "scale(1.02)"; }}
-        onMouseLeave={(e) => { e.currentTarget.style.transform = "scale(1)"; }}
       >
         {isProcessing ? (
           <>

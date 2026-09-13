@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { CheckCircle, Clock, Eye, Inbox, Pill, RefreshCw, Send, X } from "lucide-react";

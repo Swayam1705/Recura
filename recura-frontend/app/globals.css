@@ -203,3 +203,59 @@ input:focus, select:focus, textarea:focus {
     display: none !important;
   }
 }
+
+/* ============================================================
+   RECURA GLOBAL UI POLISH (Micro-interactions & Tactile Fixes)
+   ============================================================ */
+
+/* 1. Crisp Font Smoothing */
+html, body {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+/* 2. Universal Tactile Feedback for all Buttons */
+button, [role="button"], input[type="submit"], input[type="button"] {
+  user-select: none;
+  touch-action: manipulation;
+  transition: transform 0.15s cubic-bezier(0.4, 0, 0.2, 1), 
+              background-color 0.2s ease, 
+              border-color 0.2s ease, 
+              box-shadow 0.2s ease, 
+              opacity 0.2s ease;
+}
+
+button:active:not(:disabled), [role="button"]:active:not([aria-disabled="true"]) {
+  transform: scale(0.97);
+}
+
+button:disabled, [role="button"][aria-disabled="true"] {
+  cursor: not-allowed;
+  opacity: 0.55;
+  filter: grayscale(20%);
+}
+
+/* 3. Card Smoothing */
+.card, [class*="card"], [class*="Card"] {
+  transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), 
+              box-shadow 0.2s cubic-bezier(0.4, 0, 0.2, 1), 
+              border-color 0.2s ease;
+  word-break: break-word;
+}
+
+/* 4. Sleek Modern Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.25);
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.45);
+}
