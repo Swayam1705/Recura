@@ -21,14 +21,32 @@ export default function ResultCard({
   const initialProb = result.recurrenceProbability * 100;
   const conf = (result.confidence * 100).toFixed(1);
 
-  // Helper function to extract fields regardless of property casing
-  const extractAge = (input: any) => Number(input?.age ?? input?.Age ?? 48);
-  const extractSize = (input: any) => Number(input?.tumorSize ?? input?.tumor_size ?? input?.size ?? input?.noduleSize ?? 1.8);
-  const extractNodes = (input: any) => Number(input?.lymphNodes ?? input?.lymph_nodes ?? input?.nodes ?? 2);
+  // Helper functions to map AJCC T/N stages to numeric values for sliders
+  const extractAge = (input: any) => Number(input?.Age ?? input?.age ?? 48);
+  
+  const extractSizeFromTStage = (input: any) => {
+    if (input?.tumorSize || input?.tumor_size) return Number(input.tumorSize || input.tumor_size);
+    const t = String(input?.T || input?.tStage || "").toUpperCase();
+    if (t.includes("T1A")) return 0.8;
+    if (t.includes("T1B")) return 1.5;
+    if (t.includes("T2")) return 3.0;
+    if (t.includes("T3")) return 4.5;
+    if (t.includes("T4")) return 6.0;
+    return 1.8;
+  };
+
+  const extractNodesFromNStage = (input: any) => {
+    if (input?.lymphNodes || input?.lymph_nodes) return Number(input.lymphNodes || input.lymph_nodes);
+    const n = String(input?.N || input?.nStage || "").toUpperCase();
+    if (n.includes("N0")) return 0;
+    if (n.includes("N1A")) return 3;
+    if (n.includes("N1B")) return 8;
+    return 2;
+  };
 
   const baseAge = extractAge(patientInput);
-  const baseSize = extractSize(patientInput);
-  const baseNodes = extractNodes(patientInput);
+  const baseSize = extractSizeFromTStage(patientInput);
+  const baseNodes = extractNodesFromNStage(patientInput);
 
   // --- 1. WHAT-IF SIMULATOR STATE ---
   const [simAge, setSimAge] = useState<number>(baseAge);
@@ -38,8 +56,8 @@ export default function ResultCard({
   // Re-sync simulator state whenever a NEW prediction result arrives
   useEffect(() => {
     setSimAge(extractAge(patientInput));
-    setSimSize(extractSize(patientInput));
-    setSimNodes(extractNodes(patientInput));
+    setSimSize(extractSizeFromTStage(patientInput));
+    setSimNodes(extractNodesFromNStage(patientInput));
   }, [patientInput, result]);
 
   // Dynamic counterfactual risk calculation based on actual patient input
