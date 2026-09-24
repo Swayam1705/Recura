@@ -63,20 +63,26 @@ export default function LoginPage() {
         }}
       >
         {/* Back home */}
-        <div style={{ marginBottom: "1.5rem", textAlign: "center" }}>
+        <div style={{ marginBottom: "1.75rem", display: "flex", justifyContent: "flex-start" }}>
           <Link
             href="/"
             style={{
               display: "inline-flex",
               alignItems: "center",
-              gap: "0.4rem",
-              color: "#64748B",
+              gap: "0.5rem",
+              color: "#334155",
+              background: "white",
+              border: "1px solid #CBD5E1",
+              padding: "0.5rem 1rem",
+              borderRadius: "9999px",
               textDecoration: "none",
               fontSize: "0.85rem",
-              fontWeight: 600,
+              fontWeight: 700,
+              boxShadow: "0 2px 8px rgba(0,0,0,0.05)",
+              transition: "all 0.2s ease",
             }}
           >
-            <ArrowLeft size={16} /> Back to home
+            <ArrowLeft size={16} color="#2563EB" /> Back to Home
           </Link>
         </div>
 

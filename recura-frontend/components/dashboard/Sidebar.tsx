@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
@@ -85,7 +85,7 @@ export default function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
   const handleSignOut = () => {
     localStorage.removeItem("recura_token");
     localStorage.removeItem("recura_user");
-    window.location.href = "/login";
+    window.location.href = "/";
   };
 
   const bottomItems = [
