@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
@@ -12,6 +12,7 @@ import {
   Loader2,
   TrendingUp,
   Users,
+  CheckCircle,
 } from "lucide-react";
 
 const API = "http://127.0.0.1:8000";
@@ -72,7 +73,8 @@ export default function OverviewPage() {
 
   const cards = [
     { label: "Total Predictions", value: stats?.total_predictions ?? "—", icon: Database, color: "#2563EB", bg: "#EFF6FF" },
-    { label: "Unique Patients", value: stats?.unique_patients ?? "—", icon: Users, color: "#7C3AED", bg: "#F5F3FF" },
+    { label: "Unique Patients", value: stats?.unique_patients ?? "—", icon: Users,
+  CheckCircle, color: "#7C3AED", bg: "#F5F3FF" },
     { label: "High Risk Cases", value: stats?.high_risk ?? "—", icon: AlertTriangle, color: "#DC2626", bg: "#FEF2F2" },
     { label: "Medium Risk", value: stats?.medium_risk ?? "—", icon: TrendingUp, color: "#D97706", bg: "#FFFBEB" },
     { label: "Low Risk", value: stats?.low_risk ?? "—", icon: Activity, color: "#059669", bg: "#ECFDF5" },
