@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Download, FileText, Stethoscope, ShieldCheck, Sliders, Activity, X, Lock, CheckCircle2, ChevronDown, RefreshCw } from "lucide-react";
 import {
@@ -21,18 +21,33 @@ export default function ResultCard({
   const initialProb = result.recurrenceProbability * 100;
   const conf = (result.confidence * 100).toFixed(1);
 
-  // --- 1. WHAT-IF SIMULATOR STATE ---
-  const [simAge, setSimAge] = useState<number>(patientInput?.age || 48);
-  const [simSize, setSimSize] = useState<number>(patientInput?.tumorSize || 1.8);
-  const [simNodes, setSimNodes] = useState<number>(patientInput?.lymphNodes || 2);
-  const [isSimulating, setIsSimulating] = useState(false);
+  // Helper function to extract fields regardless of property casing
+  const extractAge = (input: any) => Number(input?.age ?? input?.Age ?? 48);
+  const extractSize = (input: any) => Number(input?.tumorSize ?? input?.tumor_size ?? input?.size ?? input?.noduleSize ?? 1.8);
+  const extractNodes = (input: any) => Number(input?.lymphNodes ?? input?.lymph_nodes ?? input?.nodes ?? 2);
 
-  // Dynamic counterfactual risk calculation
+  const baseAge = extractAge(patientInput);
+  const baseSize = extractSize(patientInput);
+  const baseNodes = extractNodes(patientInput);
+
+  // --- 1. WHAT-IF SIMULATOR STATE ---
+  const [simAge, setSimAge] = useState<number>(baseAge);
+  const [simSize, setSimSize] = useState<number>(baseSize);
+  const [simNodes, setSimNodes] = useState<number>(baseNodes);
+
+  // Re-sync simulator state whenever a NEW prediction result arrives
+  useEffect(() => {
+    setSimAge(extractAge(patientInput));
+    setSimSize(extractSize(patientInput));
+    setSimNodes(extractNodes(patientInput));
+  }, [patientInput, result]);
+
+  // Dynamic counterfactual risk calculation based on actual patient input
   const calculateSimulatedRisk = () => {
     let base = initialProb;
-    const sizeDelta = (simSize - (patientInput?.tumorSize || 1.8)) * 8.5;
-    const nodeDelta = (simNodes - (patientInput?.lymphNodes || 2)) * 6.0;
-    const ageDelta = (simAge - (patientInput?.age || 48)) * 0.25;
+    const sizeDelta = (simSize - baseSize) * 8.5;
+    const nodeDelta = (simNodes - baseNodes) * 6.0;
+    const ageDelta = (simAge - baseAge) * 0.25;
     const calculated = Math.min(Math.max(base + sizeDelta + nodeDelta + ageDelta, 3.2), 98.8);
     return calculated;
   };
@@ -43,7 +58,7 @@ export default function ResultCard({
   // --- 2. BLOCKCHAIN DRAWER STATE ---
   const [isBlockchainOpen, setIsBlockchainOpen] = useState(false);
 
-  // Generate deterministic mock cryptographic hashes from patient ID
+  // Deterministic cryptographic hashes from patient ID
   const blockNumber = Math.abs(result.patientId?.split("").reduce((a, b) => a + b.charCodeAt(0), 0) || 1042);
   const blockHash = "0x" + Array.from({ length: 16 }, (_, i) => ((blockNumber * (i + 1) * 31) % 16).toString(16)).join("") + "a9e2";
   const prevHash = "0x7f4b" + Array.from({ length: 16 }, (_, i) => ((blockNumber * (i + 3) * 17) % 16).toString(16)).join("");
@@ -51,7 +66,7 @@ export default function ResultCard({
 
   // --- 3. ACR-TIRADS ENGINE LOGIC ---
   const getTiradsCategory = () => {
-    const size = patientInput?.tumorSize || simSize || 1.8;
+    const size = simSize || baseSize;
     if (isHigh) {
       return {
         level: "TR5 (Highly Suspicious)",
@@ -178,13 +193,13 @@ export default function ResultCard({
           </div>
           <button
             onClick={() => {
-              setSimAge(patientInput?.age || 48);
-              setSimSize(patientInput?.tumorSize || 1.8);
-              setSimNodes(patientInput?.lymphNodes || 2);
+              setSimAge(baseAge);
+              setSimSize(baseSize);
+              setSimNodes(baseNodes);
             }}
             style={{ display: "inline-flex", gap: 4, alignItems: "center", fontSize: 12, color: "#6B21A8", background: "#F3E8FF", border: "none", borderRadius: 6, padding: "4px 8px", cursor: "pointer", fontWeight: 600 }}
           >
-            <RefreshCw size={12} /> Reset
+            <RefreshCw size={12} /> Reset to Patient Baseline
           </button>
         </div>
 
@@ -253,7 +268,7 @@ export default function ResultCard({
           <div style={{ textAlign: "right" }}>
             <span style={{ fontSize: 11, color: "#64748B", fontWeight: 700 }}>Risk Delta</span>
             <div style={{ fontSize: "0.95rem", fontWeight: 800, color: parseFloat(riskDelta) > 0 ? "#DC2626" : parseFloat(riskDelta) < 0 ? "#16A34A" : "#475569" }}>
-              {parseFloat(riskDelta) > 0 ? `+${riskDelta}% (Higher Risk)` : parseFloat(riskDelta) < 0 ? `${riskDelta}% (Lower Risk)` : "0.0% (Unchanged)"}
+              {parseFloat(riskDelta) > 0 ? `+${riskDelta}% (Higher Risk)` : parseFloat(riskDelta) < 0 ? `${riskDelta}% (Lower Risk)` : "0.0% (Baseline)"}
             </div>
           </div>
         </div>
