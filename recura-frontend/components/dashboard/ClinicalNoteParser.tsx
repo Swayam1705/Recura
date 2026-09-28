@@ -16,7 +16,7 @@ interface ClinicalNoteParserProps {
   onExtract: (data: any) => void;
 }
 
-export default function ClinicalNoteParser({ onExtract }: ClinicalNoteParserProps) {
+export default function ClinicalNoteParser({ onExtract }: { onExtract?: (data: any) => void }) {
   const [notes, setNotes] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
   const [isListening, setIsListening] = useState(false);
@@ -86,7 +86,7 @@ export default function ClinicalNoteParser({ onExtract }: ClinicalNoteParserProp
         confidence: data.confidence[key] || 0,
       }));
       setExtractedFields(fields);
-      onExtract(data.extracted);
+      if (typeof onExtract === "function") { onExtract(data.extracted); }
     } catch (err) {
       const mockExtracted = {
         age: 47,
@@ -104,7 +104,7 @@ export default function ClinicalNoteParser({ onExtract }: ClinicalNoteParserProp
         confidence: 0.85 + Math.random() * 0.13,
       }));
       setExtractedFields(fields);
-      onExtract(mockExtracted);
+      if (typeof onExtract === "function") { onExtract(mockExtracted); }
     } finally {
       setIsProcessing(false);
     }
