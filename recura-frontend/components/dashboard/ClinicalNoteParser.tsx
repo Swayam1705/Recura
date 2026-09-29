@@ -52,8 +52,19 @@ export default function ClinicalNoteParser({ onExtract }: { onExtract?: (data: a
     };
 
     recognition.onerror = (e: any) => {
-      console.error("Speech Error:", e);
+      console.warn("Speech Recognition Event:", e.error);
       setIsListening(false);
+      if (e.error === "not-allowed") {
+        setError("Microphone permission denied. Click the camera/mic icon in your browser address bar to allow access.");
+      } else if (e.error === "no-speech") {
+        setError("No speech detected. Please speak clearly into your microphone.");
+      } else if (e.error === "network") {
+        setError("Speech API network timeout. Ensure internet is active, or use sample text.");
+      } else if (e.error === "audio-capture") {
+        setError("No working microphone detected on your system.");
+      } else {
+        setError(`Dictation paused (${e.error || "event"}). You can type notes or click 'Use Sample'.`);
+      }
     };
 
     recognition.onend = () => {
