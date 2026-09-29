@@ -27,6 +27,33 @@ export default function PredictPage() {
     }, 100);
   };
 
+  
+  const handleExtract = (extracted: any) => {
+    if (!extracted) return;
+    if (extracted.age) setAge(Number(extracted.age));
+    if (extracted.response) setResponse(String(extracted.response));
+    if (extracted.risk || extracted.riskCategory) {
+      const r = String(extracted.risk || extracted.riskCategory).toLowerCase();
+      setRisk(r.includes("high") ? "High" : r.includes("med") || r.includes("inter") ? "Medium" : "Low");
+    }
+    if (extracted.tStage || extracted.T || extracted.t) {
+      const tVal = String(extracted.tStage || extracted.T || extracted.t).toUpperCase();
+      if (tVal.includes("T1A")) setT("T1a");
+      else if (tVal.includes("T1B")) setT("T1b");
+      else if (tVal.includes("T2")) setT("T2");
+      else if (tVal.includes("T3")) setT("T3");
+      else if (tVal.includes("T4")) setT("T4");
+    }
+    if (extracted.nStage || extracted.N || extracted.n) {
+      const nVal = String(extracted.nStage || extracted.N || extracted.n).toUpperCase();
+      if (nVal.includes("N1A")) setN("N1a");
+      else if (nVal.includes("N1B")) setN("N1b");
+      else setN("N0");
+    }
+    if (extracted.physicalExam || extracted.physical_examination) setPhysicalExam(String(extracted.physicalExam || extracted.physical_examination));
+    if (extracted.pathology) setPathology(String(extracted.pathology));
+  };
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
       <motion.div
