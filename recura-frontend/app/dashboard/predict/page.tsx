@@ -4,237 +4,86 @@ import { useState } from "react";
 import { motion } from "framer-motion";
 import { Brain } from "lucide-react";
 import PredictionForm from "@/components/dashboard/PredictionForm";
-import ResultCard from "@/components/dashboard/ResultCard";
 import NoteParser from "@/components/dashboard/NoteParser";
 
 export default function PredictPage() {
-  const [result, setResult] = useState<any>(null);
   const [prefillData, setPrefillData] = useState<any>(null);
-  const [lastPatientInput, setLastPatientInput] = useState<any>(null);
 
-  const handleResult = (data: any, patientInput?: any) => {
-    setResult(data);
-    if (patientInput) setLastPatientInput(patientInput);
-  };
+  const handleExtract = (extracted: any) => {
+    if (!extracted) return;
 
-  const handleFeaturesExtracted = (features: Record<string, string | number>) => {
-    // Trigger prefill in PredictionForm via key-change or state update
-    setPrefillData({ ...features, _timestamp: Date.now() });
-    // Scroll to form
+    // Normalize keys to match PredictionForm OPTIONS
+    const normalized: any = {};
+
+    if (extracted.age || extracted.Age) {
+      normalized.Age = Number(extracted.age || extracted.Age);
+    }
+
+    if (extracted.response || extracted.Response) {
+      normalized.Response = String(extracted.response || extracted.Response);
+    }
+
+    const r = String(extracted.risk || extracted.riskCategory || extracted.Risk || "").toLowerCase();
+    if (r.includes("high")) normalized.Risk = "High";
+    else if (r.includes("med") || r.includes("inter")) normalized.Risk = "Intermediate";
+    else if (r.includes("low")) normalized.Risk = "Low";
+
+    const t = String(extracted.tStage || extracted.T || extracted.t || "").toUpperCase();
+    if (t.includes("T1A")) normalized.T = "T1a";
+    else if (t.includes("T1B")) normalized.T = "T1b";
+    else if (t.includes("T2")) normalized.T = "T2";
+    else if (t.includes("T3A")) normalized.T = "T3a";
+    else if (t.includes("T3B")) normalized.T = "T3b";
+    else if (t.includes("T4A")) normalized.T = "T4a";
+    else if (t.includes("T4B")) normalized.T = "T4b";
+    else if (t.includes("T1")) normalized.T = "T1a";
+
+    const n = String(extracted.nStage || extracted.N || extracted.n || "").toUpperCase();
+    if (n.includes("N1A")) normalized.N = "N1a";
+    else if (n.includes("N1B")) normalized.N = "N1b";
+    else if (n.includes("N0")) normalized.N = "N0";
+
+    if (extracted.physicalExam || extracted.Physical_Examination) {
+      normalized.Physical_Examination = String(extracted.physicalExam || extracted.Physical_Examination);
+    }
+
+    if (extracted.pathology || extracted.Pathology) {
+      const p = String(extracted.pathology || extracted.Pathology).toLowerCase();
+      if (p.includes("micro")) normalized.Pathology = "Micropapillary";
+      else if (p.includes("papi")) normalized.Pathology = "Papillary";
+      else if (p.includes("folli")) normalized.Pathology = "Follicular";
+      else if (p.includes("hurt")) normalized.Pathology = "Hurthel cell";
+    }
+
+    normalized._timestamp = Date.now();
+    setPrefillData(normalized);
+
+    // Smooth scroll down to prediction form
     setTimeout(() => {
       const formEl = document.getElementById("prediction-form-section");
       if (formEl) formEl.scrollIntoView({ behavior: "smooth", block: "start" });
     }, 100);
   };
 
-  
-  const handleExtract = (extracted: any) => {
-    if (!extracted) return;
-    if (extracted.age) setAge(Number(extracted.age));
-    if (extracted.response) setResponse(String(extracted.response));
-    if (extracted.risk || extracted.riskCategory) {
-      const r = String(extracted.risk || extracted.riskCategory).toLowerCase();
-      setRisk(r.includes("high") ? "High" : r.includes("med") || r.includes("inter") ? "Medium" : "Low");
-    }
-    if (extracted.tStage || extracted.T || extracted.t) {
-      const tVal = String(extracted.tStage || extracted.T || extracted.t).toUpperCase();
-      if (tVal.includes("T1A")) setT("T1a");
-      else if (tVal.includes("T1B")) setT("T1b");
-      else if (tVal.includes("T2")) setT("T2");
-      else if (tVal.includes("T3")) setT("T3");
-      else if (tVal.includes("T4")) setT("T4");
-    }
-    if (extracted.nStage || extracted.N || extracted.n) {
-      const nVal = String(extracted.nStage || extracted.N || extracted.n).toUpperCase();
-      if (nVal.includes("N1A")) setN("N1a");
-      else if (nVal.includes("N1B")) setN("N1b");
-      else setN("N0");
-    }
-    if (extracted.physicalExam || extracted.physical_examination) setPhysicalExam(String(extracted.physicalExam || extracted.physical_examination));
-    if (extracted.pathology) setPathology(String(extracted.pathology));
-  };
-
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
-      <motion.div
-        initial={{ opacity: 0, y: -10 }}
-        animate={{ opacity: 1, y: 0 }}
-        style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "1rem" }}
-      >
+    <div style={{ padding: "2rem", maxWidth: "1100px", margin: "0 auto", display: "flex", flexDirection: "column", gap: "2rem" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: "0.875rem" }}>
+        <div style={{ padding: "0.75rem", borderRadius: "14px", background: "linear-gradient(135deg, #2563EB, #1D4ED8)", color: "white" }}>
+          <Brain size={26} />
+        </div>
         <div>
-          <h1 style={{
-            fontFamily: "var(--font-space)",
-            fontSize: "clamp(1.75rem, 3vw, 2.5rem)",
-            fontWeight: "700",
-            color: "#111827",
-            letterSpacing: "-0.02em",
-          }}>
-            New Prediction
-          </h1>
-          <p style={{ color: "#4B5563", marginTop: "0.5rem", fontSize: "1rem" }}>
-            Enter patient clinical data or paste notes for AI-powered analysis.
-          </p>
-        </div>
-        <div style={{
-          display: "flex",
-          alignItems: "center",
-          gap: "0.625rem",
-          padding: "0.625rem 1rem",
-          background: "linear-gradient(135deg, #ECFDF5, #F0FDF4)",
-          border: "1px solid #A7F3D0",
-          borderRadius: "9999px",
-        }}>
-          <div style={{ position: "relative", display: "flex" }}>
-            <span style={{
-              position: "absolute",
-              width: "10px",
-              height: "10px",
-              borderRadius: "50%",
-              backgroundColor: "#10B981",
-              opacity: 0.75,
-              animation: "ping 1.5s infinite",
-            }} />
-            <span style={{ width: "10px", height: "10px", borderRadius: "50%", backgroundColor: "#059669" }} />
-          </div>
-          <span style={{ color: "#065F46", fontSize: "0.8rem", fontWeight: "700" }}>
-            Deep CNN Model Active
-          </span>
-        </div>
-      </motion.div>
-
-      {/* AI Note Parser at the top */}
-      <NoteParser onFeaturesExtracted={handleFeaturesExtracted} />
-
-      {/* Grid: Form on left, Result on right */}
-      <div style={{
-        display: "grid",
-        gridTemplateColumns: "1fr",
-        gap: "1.5rem",
-      }} className="predict-grid">
-        <div id="prediction-form-section" style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
-          <PredictionForm onResult={handleResult} prefillData={prefillData} />
-        </div>
-
-        <div>
-          {result ? (
-            <ResultCard result={result} patientInput={lastPatientInput} />
-          ) : (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              style={{
-                height: "100%",
-                minHeight: "500px",
-                backgroundColor: "white",
-                border: "2px dashed #E5E7EB",
-                borderRadius: "1rem",
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                justifyContent: "center",
-                gap: "1rem",
-                textAlign: "center",
-                padding: "3rem 2rem",
-              }}
-            >
-              <motion.div
-                animate={{ scale: [1, 1.1, 1] }}
-                transition={{ duration: 2, repeat: Infinity }}
-                style={{
-                  width: "80px",
-                  height: "80px",
-                  borderRadius: "16px",
-                  background: "linear-gradient(135deg, #EFF6FF, #DBEAFE)",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  boxShadow: "0 10px 30px rgba(59, 130, 246, 0.2)",
-                }}
-              >
-                <Brain size={40} color="#2563EB" strokeWidth={1.5} />
-              </motion.div>
-              <div>
-                <h3 style={{
-                  color: "#111827",
-                  fontWeight: "700",
-                  fontFamily: "var(--font-space)",
-                  fontSize: "1.375rem",
-                  marginBottom: "0.5rem",
-                }}>
-                  Ready for AI Analysis
-                </h3>
-                <p style={{
-                  color: "#6B7280",
-                  fontSize: "0.9rem",
-                  maxWidth: "380px",
-                  lineHeight: "1.6",
-                }}>
-                  Paste clinical notes above OR fill the form manually, then click <strong>Run AI Prediction</strong>.
-                </p>
-              </div>
-              <div style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "1.5rem",
-                paddingTop: "1.5rem",
-                borderTop: "1px solid #F3F4F6",
-                width: "100%",
-                maxWidth: "360px",
-                marginTop: "0.5rem",
-                justifyContent: "space-around",
-              }}>
-                <div style={{ textAlign: "center" }}>
-                  <div style={{
-                    fontFamily: "var(--font-space)",
-                    fontWeight: "700",
-                    color: "#111827",
-                    fontSize: "1.25rem",
-                  }}>
-                    98.7%
-                  </div>
-                  <div style={{ color: "#6B7280", fontSize: "0.7rem", marginTop: "2px" }}>CNN Accuracy</div>
-                </div>
-                <div style={{ textAlign: "center" }}>
-                  <div style={{
-                    fontFamily: "var(--font-space)",
-                    fontWeight: "700",
-                    color: "#111827",
-                    fontSize: "1.25rem",
-                  }}>
-                    &lt;2s
-                  </div>
-                  <div style={{ color: "#6B7280", fontSize: "0.7rem", marginTop: "2px" }}>Response Time</div>
-                </div>
-                <div style={{ textAlign: "center" }}>
-                  <div style={{
-                    fontFamily: "var(--font-space)",
-                    fontWeight: "700",
-                    color: "#111827",
-                    fontSize: "1.25rem",
-                  }}>
-                    XAI
-                  </div>
-                  <div style={{ color: "#6B7280", fontSize: "0.7rem", marginTop: "2px" }}>Explainable</div>
-                </div>
-              </div>
-            </motion.div>
-          )}
+          <h1 style={{ margin: 0, fontSize: "1.75rem", fontWeight: 800, color: "#0F172A" }}>New Clinical Prediction</h1>
+          <p style={{ margin: 0, color: "#64748B", fontSize: "0.9rem" }}>Dictate notes or fill clinical parameters for AI recurrence risk calculation</p>
         </div>
       </div>
 
-      <style jsx>{`
-        @keyframes ping {
-          75%, 100% {
-            transform: scale(2);
-            opacity: 0;
-          }
-        }
-        @media (min-width: 1280px) {
-          .predict-grid {
-            grid-template-columns: 1.1fr 1fr !important;
-          }
-        }
-      `}</style>
+      {/* Note Parser Box */}
+      <NoteParser onExtract={handleExtract} />
+
+      {/* Form Section */}
+      <div id="prediction-form-section">
+        <PredictionForm key={prefillData?._timestamp || "pred-form-default"} initialData={prefillData || {}} />
+      </div>
     </div>
   );
 }

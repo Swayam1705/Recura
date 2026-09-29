@@ -1,6 +1,6 @@
-﻿"use client";
+"use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Brain } from "lucide-react";
 import PatientIdField from "./PatientIdField";
 import ResultCard from "./ResultCard";
@@ -15,6 +15,22 @@ const OPTIONS = {
 };
 
 export default function PredictionForm({ initialData = {} }: { initialData?: any }) {
+  
+  useEffect(() => {
+    if (initialData && Object.keys(initialData).length > 0) {
+      setFormData((prev) => ({
+        ...prev,
+        Age: initialData.Age ?? prev.Age,
+        Response: initialData.Response ?? prev.Response,
+        Risk: initialData.Risk ?? prev.Risk,
+        T: initialData.T ?? prev.T,
+        N: initialData.N ?? prev.N,
+        Physical_Examination: initialData.Physical_Examination ?? prev.Physical_Examination,
+        Pathology: initialData.Pathology ?? prev.Pathology,
+      }));
+    }
+  }, [initialData]);
+
   const [formData, setFormData] = useState({
     Age: initialData.Age || 45,
     Response: initialData.Response || "Excellent",
