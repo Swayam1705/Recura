@@ -197,7 +197,7 @@ export default function BatchUploadPage() {
           </div>
           <div style={{ background: "#D1FAE5", padding: "1.25rem", borderRadius: 16, border: "1px solid #86EFAC" }}>
             <span style={{ fontSize: 12, color: "#065F46", fontWeight: 700, textTransform: "uppercase" }}>Low Risk Cases</span>
-            <div style={{ fontSize: "1.75rem", fontWeight 800, color: "#065F46" }}>{stats.low}</div>
+            <div style={{ fontSize: "1.75rem", fontWeight: 800, color: "#065F46" }}>{stats.low}</div>
           </div>
         </div>
       )}
