@@ -6,10 +6,10 @@ import { FileText, Stethoscope, ShieldCheck, Sliders, Activity, X, CheckCircle2,
 import { generateDoctorClinicalReport, generatePatientFriendlyReport, PredictionResult } from "@/lib/generateReport";
 
 export default function ResultCard({ result, patientInput }: { result: PredictionResult; patientInput?: any }) {
-  let initialProb = Number(result.recurrenceProbability) || 0;
+  let initialProb = Number(result?.recurrenceProbability) || 0;
   if (initialProb <= 1) initialProb = initialProb * 100;
 
-  let conf = Number(result.confidence) || 0.88;
+  let conf = Number(result?.confidence) || 0.88;
   if (conf <= 1) conf = conf * 100;
   const confStr = conf.toFixed(1);
 
@@ -62,11 +62,10 @@ export default function ResultCard({ result, patientInput }: { result: Predictio
   const currentSimProb = Math.min(Math.max(initialProb + (simSize - baseSize) * 8.5 + (simNodes - baseNodes) * 6.0 + (simAge - baseAge) * 0.25, 3.2), 98.8);
   const riskDelta = (currentSimProb - initialProb).toFixed(1);
 
-  const pId = result.patientId || patientInput?.patient_id || "PT-00000";
+  const pId = result?.patientId || patientInput?.patient_id || "PT-00000";
   const blockNumber = Math.abs(pId.split("").reduce((a: number, b: string) => a + b.charCodeAt(0), 0) || 1042);
   const blockHash = "0x" + Array.from({ length: 16 }, (_, i) => ((blockNumber * (i + 1) * 31) % 16).toString(16)).join("") + "a9e2";
   const prevHash = "0x7f4b" + Array.from({ length: 16 }, (_, i) => ((blockNumber * (i + 3) * 17) % 16).toString(16)).join("");
-  const merkleRoot = "0x3c9d" + Array.from({ length: 16 }, (_, i) => ((blockNumber * (i + 7) * 13) % 16).toString(16)).join("");
 
   // ACR-TIRADS
   const size = simSize || baseSize;
@@ -91,9 +90,9 @@ export default function ResultCard({ result, patientInput }: { result: Predictio
     tiradsAction = "Consider FNA Biopsy if size ≥ 2.5 cm";
   }
 
-  // DYNAMIC XAI GENERATOR
+  // DYNAMIC XAI
   const getDynamicShap = () => {
-    const baseShap = result.shapValues || [];
+    const baseShap = result?.shapValues || [];
     return baseShap.map((s: any) => {
       let f = s.feature;
       let isConcern = s.direction === "positive";
@@ -210,9 +209,10 @@ export default function ResultCard({ result, patientInput }: { result: Predictio
                   <button type="button" onClick={() => setIsBlockchainOpen(false)} style={{ background: "#1E293B", border: "none", color: "#94A3B8", borderRadius: 8, padding: 6, cursor: "pointer" }}><X size={18} /></button>
                 </div>
                 <div style={{ display: "grid", gap: "1rem" }}>
-                  <div><span style={{ fontSize: 11, color: "#64748B", fontWeight: 700 }}>Block Height</span><div style={{ fontFamily: "monospace", fontSize: 14, color: "#38BDF8", fontWeight: 700 }}>Block #{blockNumber}</div></div>
-                  <div><span style={{ fontSize: 11, color: "#64748B", fontWeight: 700 }}>Current Block Hash</span><div style={{ fontFamily: "monospace", fontSize: 11, background: "#020617", padding: "8px", borderRadius: 8, border: "1px solid #1E293B", color: "#E2E8F0", wordBreak: "break-all" }}>{blockHash}</div></div>
-                  <div><span style={{ fontSize: 11, color: "#64748B", fontWeight: 700 }}>Previous Block Hash</span><div style={{ fontFamily: "monospace", fontSize: 11, background: "#020617", padding: "8px", borderRadius: 8, border: "1px solid #1E293B", color: "#94A3B8", wordBreak: "break-all" }}>{prevHash}</div></div>
+                  <div><span style={{ fontSize: 11, color: "#64748B", fontWeight: 700, textTransform: "uppercase" }}>Block Height</span><div style={{ fontFamily: "monospace", fontSize: 14, color: "#38BDF8", fontWeight: 700 }}>Block #{blockNumber}</div></div>
+                  <div><span style={{ fontSize: 11, color: "#64748B", fontWeight: 700, textTransform: "uppercase" }}>Current Block Hash</span><div style={{ fontFamily: "monospace", fontSize: 11, background: "#020617", padding: "8px", borderRadius: 8, border: "1px solid #1E293B", color: "#E2E8F0", wordBreak: "break-all" }}>{blockHash}</div></div>
+                  <div><span style={{ fontSize: 11, color: "#64748B", fontWeight: 700, textTransform: "uppercase" }}>Previous Block Hash</span><div style={{ fontFamily: "monospace", fontSize: 11, background: "#020617", padding: "8px", borderRadius: 8, border: "1px solid #1E293B", color: "#94A3B8", wordBreak: "break-all" }}>{prevHash}</div></div>
+                  <div><span style={{ fontSize: 11, color: "#64748B", fontWeight: 700, textTransform: "uppercase" }}>Federated Node Origin</span><div style={{ fontSize: 13, color: "#E2E8F0", fontWeight: 600 }}>Hospital_Node_Alpha (Local Client)</div></div>
                 </div>
               </div>
               <button type="button" onClick={() => setIsBlockchainOpen(false)} style={{ width: "100%", padding: "0.75rem", background: "#0284C7", color: "white", border: "none", borderRadius: 10, fontWeight: 700, cursor: "pointer" }}>Close Audit Drawer</button>
