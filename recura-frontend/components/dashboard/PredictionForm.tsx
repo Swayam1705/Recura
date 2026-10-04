@@ -59,7 +59,7 @@ export default function PredictionForm({ initialData = {} }: { initialData?: any
   };
 
   const calculateDynamicPrediction = (data: typeof formData) => {
-    let prob = 0.08; 
+    let prob = 0.08;
     const resp = String(data.Response).toLowerCase();
     if (resp.includes("structural")) prob += 0.45;
     else if (resp.includes("biochemical")) prob += 0.28;
@@ -104,10 +104,10 @@ export default function PredictionForm({ initialData = {} }: { initialData?: any
 
     const shapValues = [
       { feature: `Response (${data.Response})`, value: data.Response, impact: resp.includes("structural") || resp.includes("biochemical") ? 0.35 : -0.15, direction: resp.includes("structural") || resp.includes("biochemical") ? "positive" : "negative" },
-      { feature: `T (${data.T})`, value: data.T, impact: t.includes("T3") || t.includes("T4") ? 0.25 : -0.10, direction: t.includes("T3") || t.includes("T4") ? "positive" : "negative" },
-      { feature: `N (${data.N})`, value: data.N, impact: n.includes("N1") ? 0.20 : -0.12, direction: n.includes("N1") ? "positive" : "negative" },
-      { feature: `Risk (${data.Risk})`, value: data.Risk, impact: r.includes("high") ? 0.18 : -0.14, direction: r.includes("high") ? "positive" : "negative" },
-      { feature: `Age (${age})`, value: age, impact: age >= 55 ? 0.08 : -0.05, direction: age >= 55 ? "positive" : "negative" },
+      { feature: `T Stage (${data.T})`, value: data.T, impact: t.includes("T3") || t.includes("T4") ? 0.25 : -0.10, direction: t.includes("T3") || t.includes("T4") ? "positive" : "negative" },
+      { feature: `N Stage (${data.N})`, value: data.N, impact: n.includes("N1") ? 0.20 : -0.12, direction: n.includes("N1") ? "positive" : "negative" },
+      { feature: `Initial Risk (${data.Risk})`, value: data.Risk, impact: r.includes("high") ? 0.18 : -0.14, direction: r.includes("high") ? "positive" : "negative" },
+      { feature: `Age (${age})`, value: age, impact: age >= 55 ? 0.09 : -0.05, direction: age >= 55 ? "positive" : "negative" },
       { feature: `Physical Examination (${data.Physical_Examination})`, value: data.Physical_Examination, impact: String(data.Physical_Examination).toLowerCase().includes("normal") ? -0.08 : 0.12, direction: String(data.Physical_Examination).toLowerCase().includes("normal") ? "negative" : "positive" },
       { feature: `Pathology (${data.Pathology})`, value: data.Pathology, impact: path.includes("papi") ? -0.10 : 0.08, direction: path.includes("papi") ? "negative" : "positive" }
     ];
@@ -118,18 +118,20 @@ export default function PredictionForm({ initialData = {} }: { initialData?: any
   const handlePredict = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    setResult(null);
+
+    const dynamicRes = calculateDynamicPrediction(formData);
 
     try {
-      const res = await fetch("http://127.0.0.1:8000/predict", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(formData) });
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+      const res = await fetch(`${apiUrl}/predict`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(formData) });
       if (res.ok) {
         const data = await res.json();
         setResult(data);
       } else {
-        setResult(calculateDynamicPrediction(formData));
+        setResult(dynamicRes);
       }
     } catch {
-      setResult(calculateDynamicPrediction(formData));
+      setResult(dynamicRes);
     } finally {
       setLoading(false);
     }
